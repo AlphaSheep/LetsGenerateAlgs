@@ -30,7 +30,7 @@ var expandBaseN = function(n, base, nDigits) {
     var result = [];
     var temp = n;       
     
-    for (i=0; i<nDigits; i++) {
+    for (var i=0; i<nDigits; i++) {
         result[nDigits-1-i] = temp % base;
         temp = Math.floor(temp / base);
     }        
