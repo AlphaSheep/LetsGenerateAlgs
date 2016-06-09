@@ -7,7 +7,8 @@ var moveTables = require("./moveTables");
 var startStateRaw = [[0,0,0,0,0,0,0,0], [0,1,2,3,4,5,6,7], [0,0,0,0,0,0,0,0,0,0,0,0], [0,1,2,3,4,5,6,7,8,9,10,11], [0,1,2,3,4,5]];
 var startState = coord.coords333(startStateRaw);
 
-console.log(startState);
+//console.log(startState);
+//console.log(coord.invertCoords333(startState));
 
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
 var allowedMoves = ["R","R'","R2","U","U'","U2"];
@@ -30,7 +31,8 @@ while (solving) {
     
     for (key in allowedMoves) {
         var move = allowedMoves[key];
-        //console.log(move, nStatesNow);
+//        console.log(move, nStatesNow);
+        
         for (i=0; i<nStatesNow; i++) {            
             var state = states[i];
             var sequence = sequences[i];
@@ -40,30 +42,30 @@ while (solving) {
                 continue;
             }    
             
-            // state = moves.applyMove(move, state);
-
-            states.push(state);
-            sequences.push(sequences[i].concat(move));
             
+            state = moveTables.applyMove(move, state);
+            
+            states.push(state);
+            sequences.push(sequence.concat(move));
             
             if (!(i % 10000)) {
                 nowTime = new Date().getTime();
                 console.log("\ton state:", i, 
-                            "\t# states:", nStatesTotal+states.length,
+                            "\t# states:", [nStatesNow, nStatesTotal, nStatesTotal+states.length],
                             "\tnMoves:", nMoves,
                             "\tTime elapsed:", (nowTime-startTime)/1000, "s",
-                            "\tmoves:", (sequences[i].concat(move)).join(" "));
+                            "\tmoves:", (sequence.concat(move)).join(" "));
             }
         }
     }    
     
     // Dump all sequences that have been continued
     states = states.slice(nStatesNow, states.length);
-    sequences = sequences.slice(nStatesNow, sequences.lenght);    
+    sequences = sequences.slice(nStatesNow, sequences.length);    
 
     // Update state indices
+    nStatesTotal += states.length + nStatesNow;
     nStatesNow = states.length;
-    nStatesTotal += nStatesNow;
     
     nowTime = new Date().getTime();    
     console.log("Current moves: ", nMoves, 
@@ -76,4 +78,4 @@ while (solving) {
     }
 }
 
-console.log(sequences/length);
+console.log(sequences.length);
