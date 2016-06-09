@@ -141,6 +141,8 @@ exports.applyMoveCentr = applyMoveCentr;
 
 exports.applyMove = applyMove;
 
+exports.movesDef = movesDef;
+
 
 
 
