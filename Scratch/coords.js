@@ -1,5 +1,3 @@
-
-
 var coordOri = function(oristate, pieceType) {
     // Representation of the orientation of all pieces of a type.
     // If there are n pieces, each with k orientations,
@@ -7,7 +5,7 @@ var coordOri = function(oristate, pieceType) {
     
     var coord = 0;
     var k = pieceType.nOrientations;
-    for (var i = 0; i < oristate.length-1; i++) {
+    for (var i = 0; i < oristate.length; i++) {
         coord = (k * coord) + oristate[i];
     }
     return coord;
@@ -43,8 +41,8 @@ var coordFixedPerm = function(permstate) {
     // assumptions about which permutations are impossible. The number of
     // gaps will equal the number of impossible arrangements of two pieces.
     // Eg. Considering the centres on a Rubik's cube, (n^2-n) = 30, but 6
-    // permutations will be missing, and these will correspond to permutations
-    // involving a centre on top, and it's opposite centre in front.
+    // permutations will be impossible, and these will correspond to permutations
+    // involving a centre on top and it's opposite centre in front.
     
     var coord = permstate[0] * (permstate.length-1);    
     for (var i = 2; i < permstate.length; i++){
@@ -56,113 +54,45 @@ var coordFixedPerm = function(permstate) {
 };
 
 
-
-var coordCentrPerm = function (centrstate) {
-    // Representation of the permutation of the centre. 
-    // Since the first 2 centres fix the remaining six,
-    // only those are needed. The coord is between 0 and 24.
-    var coord = centrstate[0]*4;    
-    for (var i = 2; i < centrstate.length; i++){
-        if (centrstate[i] < centrstate[1]) {
-            coord++;
-        }
-    }
-    return coord;
-};
-
-var coordCornerOri = function (costate) {
-    // Representation of the orientation of the corners. 
-    // Since the orientation of the 8th corner can be determined
-    // from the other 7, this coord is between 0 and 2186.
-    var coord = 0;
-    for (var i = 0; i < costate.length-1; i++) {
-        coord = (3 * coord) + costate[i];
-    }
-    return coord;
-};
-
-var coordEdgeOri = function (eostate) {
-    // Representation of the orientation of the edges. 
-    // Since the orientation of the 12th edge can be determined
-    // from the other 11, this coord is between 0 and 2047.
-    var coord = 0;
-    for (var i = 0; i < eostate.length-1; i++) {
-        coord = (2 * coord) + eostate[i];
-    }
-    return coord;
-};
-
-var coordCornerPerm = function (cpstate) {
-    // Representation of the permutation of the corners. 
-    // The coord is between 0 and 40,319.
-    var coord = 0;
-    for (var i = 0; i < cpstate.length-1; i++){
-        for (var j = i+1; j < cpstate.length; j++){
-            if (cpstate[j] < cpstate[i]) {
-                coord++;
-            }
-        }
-        coord *= cpstate.length-i-1;
-    }
-    return coord;
-};
-
-var coordEdgePerm = function (epstate) {
-    // Representation of the permutation of the edges. 
-    // The coord is between 0 and 479,001,599.
-    var coord = 0;    
-    for (var i = 0; i < epstate.length-1; i++){
-        for (var j = i+1; j < epstate.length; j++){
-            if (epstate[j] < epstate[i]) {
-                coord++;
-            }
-        }
-        coord *= epstate.length-i-1;
-    }
-    return coord;
-};
-
-// Because the full coordEP has 12!-1 = 479,001,599 possible states,
-// it is impractical to store a full move table in memory (~3.6GB per move)
-// Instead, seperate into three coordinates.
-
-var coordEsliceEdgeLocs = function(epstate) {
-    // Representation of the locations of the edges that belong 
-    // in the E slice. Ordering is ignored.
-    // The coord is between 0 and 479,001,599.
-    var coord = 0;    
-    for (var i = 0; i < epstate.length-1; i++){
-        for (var j = i+1; j < epstate.length; j++){
-            if (epstate[j] < epstate[i]) {
-                coord += 2;
-            }
-        }
-        coord *= epstate.length-i-1;
-    }
-    return coord;
-};
-
+var coordPermLarge = function(permstate) {
+    // Special multi-dimensional coord for permutations of larger numbers of pieces.
+    // For example, consider the 12 edges on a Rubik's cube.
+    // Because the edges have 12!-1 = 479,001,599 possible permutations,
+    // it is impractical to store a full move table in memory (~3.6GB per move)
+    // Instead, these can be seperated into a number of smaller coordinates
+    // representing arrangements of subgroups of 4 pieces each.
     
+    var subGrpSize = 4;
+    
+    var coord = [];
+    
+    for (var i = 0; i < permstate.length; i++){                
+        var idx = Math.floor(permstate[i]/subGrpSize); // Determine which subgroup this piece belongs to
+        if (!coord[idx]) {
+            coord[idx] = 0; // If the subgroup does not have a coordinate yet, initialise one.
+        }                
+        coord[idx] += i * Math.pow(permstate.length, (subGrpSize-1) - (permstate[i] % subGrpSize));
+    }
+    return coord;
+};
 
 
 var rawCoords = function (state) {
     return [
-        coordCornerOri(state[0]),
-        coordCornerPerm(state[1]),
-        coordEdgeOri(state[2]),
-        coordEdgePerm(state[3]),
+        coordOri(state[0], {nOrientations: 3}),
+        coordPermLarge(state[1]),
+        coordOri(state[2], {nOrientations: 2}),
+        coordPermLarge(state[3]),
         coordFixedPerm(state[4])
     ];
 };
 
 
-
-exports.coordCornerOri = coordCornerOri;
-exports.coordEdgeOri = coordEdgeOri;
-exports.coordCornerPerm = coordCornerPerm;
-exports.coordEdgePerm = coordEdgePerm;
-exports.coordCentrPerm = coordCentrPerm;
+exports.coordOri = coordOri;
+exports.coordPerm = coordPerm;
+exports.coordFixedPerm = coordFixedPerm;
+exports.coordPermLarge = coordPermLarge;
 
 exports.rawCoords = rawCoords;
 
-
+    
