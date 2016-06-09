@@ -1,3 +1,6 @@
+utils = require("./utils");
+
+
 var coordOri = function(oristate, pieceType) {
     // Representation of the orientation of all pieces of a type.
     // If there are n pieces, each with k orientations,
@@ -36,7 +39,10 @@ var coordFixedPerm = function(permstate) {
     // Since the pieces are fixed relative to each other, the location 
     // of just two pieces determines the location of the rest.
     // If there are n pieces, then the coord will be in the range 0..(n^2-n)
-    
+    //
+    // Note that this cannot be inverted easily without knowing the available moves. 
+    // Use coordPerm for a less compact, but easily invertable version
+    //
     // There may be gaps in coordinate, as we don't want to make any 
     // assumptions about which permutations are impossible. The number of
     // gaps will equal the number of impossible arrangements of two pieces.
@@ -60,7 +66,7 @@ var coordPermLarge = function(permstate) {
     // Because the edges have 12!-1 = 479,001,599 possible permutations,
     // it is impractical to store a full move table in memory (~3.6GB per move)
     // Instead, these can be seperated into a number of smaller coordinates
-    // representing arrangements of subgroups of 4 pieces each.
+    // representing the positions of subgroups of 4 pieces each.
     
     var subGrpSize = 4;
     
@@ -88,10 +94,75 @@ var rawCoords = function (state) {
 };
 
 
+var invertCoordOri = function (coord, pieceType) {
+    // Given an orientation coordinate, returns the corresponding state
+    
+    return utils.expandBaseN(coord, pieceType.nOrientations, pieceType.nPieces);
+};
+
+
+var invertCoordPerm = function (coord, pieceType) {
+    // Given a permutation coordinate, returns the corresponding state
+    
+    // Initialise state as all zeroes
+    var state = [];
+    var temp = coord;
+    
+    for (var i=pieceType.nPieces-1; i >= 0; i--) {
+
+        // Decode the factorial base number
+        var base = (pieceType.nPieces - i);
+        state[i] = temp % base;
+        temp = Math.floor(temp / base);
+        
+        // Decode the Lehmer code
+        for (var j=i+1; j<pieceType.nPieces; j++) {
+            if (state[j] >= state[i]) {
+                state[j]++;
+            }
+        }
+    }    
+    return state    
+};
+
+
+var invertCoordFixedPerm = function (coord) {
+    // Given a coordinate for a permutation of fixed pieces, returns the corresp 
+        
+    throw(Error("Not implemented"));
+};
+
+
+var invertCoordPermLarge = function (coord, pieceType) {
+    // Given a set of coordinates for a large permutation, 
+    // return the corresponding state
+    
+    var invState = [];
+    
+    var subGrpSize = 4;
+    for (var i=0; i < coord.length; i++) {
+        var thisSubState = utils.expandBaseN(coord[i], pieceType.nPieces, subGrpSize);
+        invState = invState.concat(thisSubState);        
+    }
+    
+    var state = [];
+    for (var i=0; i < pieceType.nPieces; i++) {
+        state[invState[i]] = i;
+    }   
+    
+    return state;
+};
+
+
 exports.coordOri = coordOri;
 exports.coordPerm = coordPerm;
 exports.coordFixedPerm = coordFixedPerm;
 exports.coordPermLarge = coordPermLarge;
+
+exports.invertCoordOri = invertCoordOri;
+exports.invertCoordPerm = invertCoordPerm;
+exports.invertCoordFixedPerm = invertCoordFixedPerm;
+exports.invertCoordPermLarge = invertCoordPermLarge;
 
 exports.rawCoords = rawCoords;
 
