@@ -1,28 +1,48 @@
-var coord = require("./coords");
-var moves = require("./moves");
+var coord = require("./coords2");
 
-var moveTables = require("./moveTables");
+var moveTables = require("./moveTables2");
 
 var utils = require("./utils");
 
-var startStateRaw = [[0,0,0,0,0,0,0,0], [0,1,2,3,4,5,6,7], [0,0,0,0,0,0,0,0,0,0,0,0], [0,1,2,3,4,5,6,7,8,9,10,11], [0,1,2,3,4,5]];
-var startState = coord.coords333(startStateRaw);
+
+
+var maxSearchDepth  = 20;
 
 
 
-var targetStateRaw = [[0,0,0,0,0,0,0,0], [0,1,2,3,4,5,6,7], [0,0,0,0,0,0,0,0,0,0,0,0], [0,2,3,1,4,5,6,7,8,9,10,11], [0,1,2,3,4,5]];
-var targetState = coord.coords333(targetStateRaw);
+var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+var startState = coord.get333hashes(startStateRaw);
+
+
+console.log(startState);
+
+
+var targetStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+var targetState = coord.get333hashes(targetStateRaw);
 
     
-//console.log(startState);
-//console.log(coord.invertCoords333(startState));
+
+
 
 // var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
-var allowedMoves = ["R","R'","R2","U","U'","U2"];
+// var allowedMoves = ["R","R'","R2","U","U'","U2"];
 // var allowedMoves = ["R","R'","U","U'","L","L'"];
-// var allowedMoves = ["R","R'","R2","U","U'","F","F'"];
+ var allowedMoves = ["R","R'","R2","U","U'","F","F'"];
 
-var moveKeys = Object.keys(moves.movesDef); // Note: this is in no particular order
+console.log("Populating move tables...")
+var startTime = new Date().getTime();
+
+// Populate move tables
+for (var i=0; i < allowedMoves.length; i++) {
+    moveTables.build333MoveTable(allowedMoves[i]);
+}
+
+var nowTime = new Date().getTime();
+var elapsedTime = (nowTime-startTime)/1000;
+
+console.log("Done in", elapsedTime, "seconds.")
+
+
 
 
 var nMoves = 0;
@@ -69,15 +89,17 @@ while (solving) {
 //            }
             
             //state = coord.coords333(moves.applyMove(move, coord.invertCoords333(state)));
-            state = moveTables.applyMoveWithTables(move, state);
+            state = moveTables.moveLookup(move, state);
                   
-            if (utils.isMemberOf(state, visited)) {
-                continue;
-            }                    
+//            console.log(state)
+            
+//            if (utils.isMemberOf(state, visited)) {
+//                continue;
+//            }
             
             nextMoveStates.push(state);
             nextMoveSequences.push(sequence.concat(move));
-            nextVisitedStates.push(visited.concat([state]));
+//            nextVisitedStates.push(visited.concat([state]));
             
             if (!(i % 100000)) {
                 nowTime = new Date().getTime();
@@ -119,9 +141,12 @@ while (solving) {
                 "\tTime elapsed: ", elapsedTime, "s\n\n");
     
     
-    if (nMoves>=20) {
+    if (nMoves >= maxSearchDepth) {
         solving = false;
     }
 }
 
 console.log(sequences.length);
+
+
+/**/
