@@ -146,7 +146,7 @@ var invertCoordPermLarge = function (coord, pieceType) {
 var coords333 = function (state) {
     return [
         coordOri(state[0], {nOrientations: 3}),
-        coordPermLarge(state[1]),
+        coordPerm(state[1]),
         coordOri(state[2], {nOrientations: 2}),
         coordPermLarge(state[3]),
         coordPerm(state[4])
@@ -156,7 +156,7 @@ var coords333 = function (state) {
 var invertCoords333 = function (stateCoords) {
     return [
         invertCoordOri(stateCoords[0], {nOrientations: 3, nPieces: 8}),
-        invertCoordPermLarge(stateCoords[1], {nOrientations: 3, nPieces: 8}),
+        invertCoordPerm(stateCoords[1], {nOrientations: 3, nPieces: 8}),
         invertCoordOri(stateCoords[2], {nOrientations: 2, nPieces: 12}),
         invertCoordPermLarge(stateCoords[3], {nOrientations: 2, nPieces: 12}),
         invertCoordPerm(stateCoords[4], {nOrientations: 1, nPieces: 6})
