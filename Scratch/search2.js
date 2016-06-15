@@ -17,8 +17,8 @@ var startState = coord.get333hashes(startStateRaw);
 console.log(startState);
 
 
-//var targetStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,10,4,5,6,7,8,9,1,11,12], [1,2,3,4,5,6]];
-var targetStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,4,3,1,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+var targetStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,11,4,5,6,7,8,9,10,1,12], [1,2,3,4,5,6]];
+//var targetStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,4,3,1,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 var targetState = coord.get333hashes(targetStateRaw);
 
     
@@ -49,10 +49,10 @@ console.log("Done in", elapsedTime, "seconds.")
 var nMoves = 0;
 var solving = true;
 
-var states = [startState];
+//var states = [startState];
 var sequences = [[]];
 
-var nextMoveStates = [];
+//var nextMoveStates = [];
 var nextMoveSequences = [];
 
 var nStatesNow = 1;
@@ -68,28 +68,37 @@ console.log("\n\nStarting search...")
 while (solving) {
     nMoves++;
     
-    for (moveKey in allowedMoves) {
-        var move = allowedMoves[moveKey];
+    for (var m=0; m<allowedMoves.length; m++) {
+        var move = allowedMoves[m];
         
-        for (i=0; i<nStatesNow; i++) {            
-            var sequence = sequences[i];
+        for (var i=0; i<nStatesNow; i++) {            
+            var sequenceKeys = sequences[i];
+            var sequence = [];
+            for (var j=0; j<sequenceKeys.length; j++) {
+                sequence[j] = allowedMoves[sequenceKeys[j]];
+            }                
             
             // Skip redundant moves
             if (moves.isTrivialMove(move, sequence)) {
                 continue;
             }
-                
-            state = moveTables.moveLookup(move, states[i]);
+            
+            // Compute the state that's reached by the current sequence
+            var state = startState;
+            for (var j=0; j<sequence.length; j++)            
+                state = moveTables.moveLookup(sequence[j], state);
+            state = moveTables.moveLookup(move, state);
         
+
             
             if (!(i % 100000)) {
                 nowTime = new Date().getTime();
                 elapsedTime = (nowTime-startTime)/1000;
                 console.log("\tnMoves:", nMoves,
-                            "\t# states:", nStatesTotal+nextMoveStates.length,
-                            "(in memory:", states.length+nextMoveStates.length,")",
+                            "\t# states:", nStatesTotal+nextMoveSequences.length,
+                            "(in memory:", sequences.length+nextMoveSequences.length,")",
                             "\tTime elapsed:", elapsedTime, "s",
-                            "\t(", Math.round((nStatesTotal+nextMoveStates.length)/elapsedTime), "states/s )");
+                            "\t(", Math.round((nStatesTotal+nextMoveSequences.length)/elapsedTime), "states/s )");
                             // "\tmoves:", (sequence.concat(move)).join(" "));
             }
             
@@ -101,22 +110,24 @@ while (solving) {
                 continue;
             }
 
-            nextMoveStates.push(state);
-            nextMoveSequences.push(sequence.concat(move));
+//            nextMoveStates.push(state);
+            nextMoveSequences.push(sequenceKeys.concat(m));
 
+            
+            
         }
     }    
     
     // Dump all sequences that have been continued
-    states = nextMoveStates;
+//    states = nextMoveStates;
     sequences = nextMoveSequences;
     
-    nextMoveStates = [];
+//    nextMoveStates = [];
     nextMoveSequences = [];
 
     // Update state indices
-    nStatesTotal += states.length + nStatesNow;
-    nStatesNow = states.length;
+    nStatesTotal += sequences.length + nStatesNow;
+    nStatesNow = sequences.length;
     
     nowTime = new Date().getTime();    
     elapsedTime = (nowTime-startTime)/1000;
