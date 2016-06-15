@@ -1,180 +1,195 @@
-var utils = require("./utils");
 
-
-var coordOri = function(oristate, pieceType) {
-    // Representation of the orientation of all pieces of a type.
-    // If there are n pieces, each with k orientations,
-    // then the coord will be in the range 0..(k^n)
+var getHash = function(state, maxStateVal) {
+    // Returns a single integer uniquely identifying a state. State is an 
+    // array of non-negative integers uniquely identifying the state of 
+    // each piece, maxStateVal is the maximum value that any element in 
+    // state would be expected to have.
     
-    var coord = 0;
-    var k = pieceType.nOrientations;
-    for (var i = 0; i < oristate.length; i++) {
-        coord = (k * coord) + oristate[i];
+    var hash = 0;
+    for (var i = 0; i < state.length; i++) {
+        hash = ((maxStateVal+1) * hash) + state[i];
     }
-    return coord;
+    return hash;
 };
 
-
-var coordPerm = function(permstate) {
-    // Representation of the permutation of all pieces of a type.
-    // If there are n pieces, then the coord will be in the range 0..(n!-1)
-    // Mathematically, the permutation is converted to it's Lehmer code, 
-    // which is expressed in a factorial number system. 
-    
-    var coord = 0;
-    for (var i = 0; i < permstate.length-1; i++){
-        for (var j = i+1; j < permstate.length; j++){
-            if (permstate[j] < permstate[i]) {
-                coord++;
-            }
-        }
-        coord *= permstate.length-i-1;
-    }
-    return coord;
-};
+exports.getHash = getHash;
 
 
-var coordFixedPerm = function(permstate) {
-    // Representation of the permutation of all fixed pieces of a type.
-    // Since the pieces are fixed relative to each other, the location 
-    // of just two pieces determines the location of the rest.
-    // If there are n pieces, then the coord will be in the range 0..(n^2-n)
-    //
-    // Note that this cannot be inverted easily without knowing the available moves. 
-    // Use coordPerm for a less compact, but easily invertable version
-    //
-    // There may be gaps in coordinate, as we don't want to make any 
-    // assumptions about which permutations are impossible. The number of
-    // gaps will equal the number of impossible arrangements of two pieces.
-    // Eg. Considering the centres on a Rubik's cube, (n^2-n) = 30, but 6
-    // permutations will be impossible, and these will correspond to permutations
-    // involving a centre on top and it's opposite centre in front.
-    
-    var coord = permstate[0] * (permstate.length-1);    
-    for (var i = 2; i < permstate.length; i++){
-        if (permstate[i] < permstate[1]) {
-            coord++;
-        }
-    }
-    return coord;
-};
-
-
-var coordPermLarge = function(permstate) {
-    // Special multi-dimensional coord for permutations of larger numbers of pieces.
-    // For example, consider the 12 edges on a Rubik's cube.
-    // Because the edges have 12!-1 = 479,001,599 possible permutations,
-    // it is impractical to store a full move table in memory (~3.6GB per move)
-    // Instead, these can be seperated into a number of smaller coordinates
-    // representing the positions of subgroups of 4 pieces each.
-    
-    var subGrpSize = 4;
-    
-    var coord = [];
-    
-    for (var i = 0; i < permstate.length; i++){                
-        var idx = Math.floor(permstate[i]/subGrpSize); // Determine which subgroup this piece belongs to
-        if (!coord[idx]) {
-            coord[idx] = 0; // If the subgroup does not have a coordinate yet, initialise one.
-        }                
-        coord[idx] += i * Math.pow(permstate.length, (subGrpSize-1) - (permstate[i] % subGrpSize));
-    }
-    return coord;
-};
-
-
-var invertCoordOri = function (coord, pieceType) {
-    // Given an orientation coordinate, returns the corresponding state
-    
-    return utils.expandBaseN(coord, pieceType.nOrientations, pieceType.nPieces);
-};
-
-
-var invertCoordPerm = function (coord, pieceType) {
-    // Given a permutation coordinate, returns the corresponding state
-    
-    // Initialise state as all zeroes
-    var state = [];
-    var temp = coord;
-    
-    for (var i=pieceType.nPieces-1; i >= 0; i--) {
-
-        // Decode the factorial base number
-        var base = (pieceType.nPieces - i);
-        state[i] = temp % base;
-        temp = Math.floor(temp / base);
-        
-        // Decode the Lehmer code
-        for (var j=i+1; j<pieceType.nPieces; j++) {
-            if (state[j] >= state[i]) {
-                state[j]++;
-            }
-        }
-    }    
-    return state    
-};
-
-
-var invertCoordFixedPerm = function (coord) {
-    // Given a coordinate for a permutation of fixed pieces, returns the corresp 
-        
-    throw(Error("Not implemented"));
-};
-
-
-var invertCoordPermLarge = function (coord, pieceType) {
-    // Given a set of coordinates for a large permutation, 
-    // return the corresponding state
-    
-    var invState = [];
-    
-    var subGrpSize = 4;
-    for (var i=0; i < coord.length; i++) {
-        var thisSubState = utils.expandBaseN(coord[i], pieceType.nPieces, subGrpSize);
-        invState = invState.concat(thisSubState);        
-    }
+var invertHash = function(hash, maxStateVal, nPieces) {
+    // Returns the state that corresponds to the given hash. If nPieces is 
+    // provided, the result is left padded with zeros to give the required 
+    // number of elements.  
     
     var state = [];
-    for (var i=0; i < pieceType.nPieces; i++) {
-        state[invState[i]] = i;
-    }   
+    var temp = hash;
     
+    while (temp>0) {
+        state.unshift(temp % (maxStateVal+1));
+        temp = Math.floor(temp / (maxStateVal+1));
+    }
+    
+    // Note: this relies on the fact that number < undefined to avoid
+    // having to check whether nPieces was provided or not.
+    while (state.length < nPieces) {
+        state.unshift(0);
+    }
+    
+    return state;    
+};
+
+exports.invertHash = invertHash;
+
+
+var findPieces = function(state, pieces, maxStateVal) {
+    // Returns the location of pieces in state. If the piece does not exist, 
+    // then return maxStateVal.
+
+    var position = [];
+    for (var i=0; i<pieces.length; i++) {
+        position[i] = state.indexOf(pieces[i]);
+        if (position[i] === -1) {
+            position[i] = maxStateVal;
+        }
+    }
+    return position;
+};
+exports.findPieces = findPieces;
+
+
+var positionsToState = function(positions, pieces, nPieces, maxStateVal) {
+    // Returns the location of pieces in state. If the piece does not exist, 
+    // then return maxStateVal. Note that this only returns the state of the 
+    // pieces of interest. All other positions are zeros. Use mergeStates to
+    // combine the results for all pieces.
+    
+    var state = [];
+    for (var i=0; i<nPieces; i++) {
+        state[i] = 0;
+    }
+    for (var i=0; i<positions.length; i++) {
+        if (positions[i] < state.length && positions[i] !== maxStateVal) {
+            state[positions[i]] = pieces[i];
+        }
+    }
     return state;
 };
+exports.positionsToState = positionsToState;
 
 
-var coords333 = function (state) {
-    return [
-        coordOri(state[0], {nOrientations: 3}),
-        coordPerm(state[1]),
-        coordOri(state[2], {nOrientations: 2}),
-        coordPermLarge(state[3]),
-        coordPerm(state[4])
-    ];
-};
-
-var invertCoords333 = function (stateCoords) {
-    return [
-        invertCoordOri(stateCoords[0], {nOrientations: 3, nPieces: 8}),
-        invertCoordPerm(stateCoords[1], {nOrientations: 3, nPieces: 8}),
-        invertCoordOri(stateCoords[2], {nOrientations: 2, nPieces: 12}),
-        invertCoordPermLarge(stateCoords[3], {nOrientations: 2, nPieces: 12}),
-        invertCoordPerm(stateCoords[4], {nOrientations: 1, nPieces: 6})
-    ];
-};
-
-exports.coordOri = coordOri;
-exports.coordPerm = coordPerm;
-exports.coordFixedPerm = coordFixedPerm;
-exports.coordPermLarge = coordPermLarge;
-
-exports.invertCoordOri = invertCoordOri;
-exports.invertCoordPerm = invertCoordPerm;
-exports.invertCoordFixedPerm = invertCoordFixedPerm;
-exports.invertCoordPermLarge = invertCoordPermLarge;
-
-exports.coords333 = coords333;
-
-exports.invertCoords333 = invertCoords333;
-
+var mergeStates = function (subStates) {
+    // Merge several substates into state. Assumes that all pieces in a 
+    // substate that are zeros can be ignored.
     
+    var state = subStates[0];
+    for (var i=1; i<subStates.length; i++) {
+        for (var j=0; j<subStates[i].length; j++) {
+            state[j] += subStates[i][j];
+        }
+    }
+    return state;
+};
+exports.mergeStates = mergeStates;
+
+
+var get333hashes = function(state) {
+    // Returns a set of hashes for a 333 state
+    
+    return [
+        getHash(state[0], 2),
+        getHash(findPieces(state[1],[1,2,3,4],8),8),
+        getHash(findPieces(state[1],[5,6,7,8],8),8),
+        getHash(state[2], 1),
+        getHash(findPieces(state[3],[1,2,3,4],12),12),
+        getHash(findPieces(state[3],[5,6,7,8],12),12),
+        getHash(findPieces(state[3],[9,10,11,12],12),12),
+        getHash(state[4], 6)
+    ];
+};
+exports.get333hashes = get333hashes;
+
+
+var invert333hashes = function(hashes) {
+    // Returns a set of hashes for a 333 state
+    
+    var cp1 = invertHash
+    
+    return [
+        invertHash(hashes[0], 3, 8),
+        mergeStates([positionsToState(invertHash(hashes[1], 8, 4), [1,2,3,4], 8, 8),
+                     positionsToState(invertHash(hashes[2], 8, 4), [5,6,7,8], 8, 8)]),
+        invertHash(hashes[3], 2, 12),
+        mergeStates([positionsToState(invertHash(hashes[4], 12, 4), [1,2,3,4], 12, 12),
+                     positionsToState(invertHash(hashes[5], 12, 4), [5,6,7,8], 12, 12),
+                     positionsToState(invertHash(hashes[6], 12, 4), [9,10,11,12], 12, 12)]),
+        invertHash(hashes[7], 6, 6)
+    ];
+};
+exports.get333hashes = get333hashes;
+
+
+
+
+
+
+
+
+// Test cases
+// TODO: Move this into a proper test suite
+
+/*
+console.log("\nTesting getHash\n")
+console.log(getHash([0,1,1,0,1,0,0,1], 2));
+console.log(getHash([0,1,1,0,1,0,0,1], 3));
+console.log(getHash([0,1,2,0,1,0,2,1], 3));
+console.log(getHash([2,0,2,0,2,1,1,0], 2));
+console.log(getHash([0,4,1,10], 12));
+console.log(getHash([8,6,3,7], 12));
+console.log(getHash([5,2,11,9], 12));/**/
+/**/
+
+
+/*
+console.log("\nTesting invertHash\n")
+console.log(invertHash(1000, 2, 12));
+console.log(invertHash(5185, 3));
+console.log(invertHash(6217, 3, 8));
+console.log(invertHash(4926, 2, 8));
+console.log(invertHash(699, 12, 4));
+console.log(invertHash(18636, 12, 4));
+console.log(invertHash(11475, 12, 4));/**/
+/**/
+
+
+/*
+console.log("\nTesting findPieces\n")
+console.log(findPieces([1,2,3,4,5,6,7,8], [4,5,6], 8));
+console.log(findPieces([1,3,5,7,2,4,6,8], [1,2,3], 8));
+console.log(findPieces([0,0,0,0,5,6,7,8], [1,4,5,6], 8));
+console.log(findPieces([1,3,10,7,2,9,6,8,5,12,4,11], [1,2,3,4], 12));
+console.log(findPieces([1,3,10,7,2,9,6,8,5,12,4,11], [5,6,7,8], 12));
+console.log(findPieces([1,3,10,7,2,9,6,8,5,12,4,11], [9,10,11,12], 12));
+/**/
+
+
+/*
+console.log("\nTesting positionsToState\n")
+console.log(positionsToState([3,4,5], [4,5,6], 8, 8));
+console.log(positionsToState([0,4,1], [1,2,3], 8, 8));
+console.log(positionsToState([8,8,4,5], [1,4,5,6], 8, 8));
+
+console.log(mergeStates([positionsToState([0,4,1,10], [1,2,3,4], 12, 12),
+                         positionsToState([8,6,3,7], [5,6,7,8], 12, 12),
+                         positionsToState([5,2,11,9], [9,10,11,12], 12, 12)]));
+/**/
+
+
+/*
+console.log("\nTesting get333hashes\n")
+var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+console.log(get333hashes(startStateRaw));
+
+console.log(invert333hashes([0, 102, 3382, 0, 198, 9718, 19238, 22875]));
+/**/
+
+
+
