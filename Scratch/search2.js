@@ -1,3 +1,6 @@
+"use strict";
+
+
 var coord = require("./coords2");
 var moves = require("./moves")
 var moveTables = require("./moveTables2");
