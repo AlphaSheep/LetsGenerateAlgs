@@ -63,6 +63,70 @@ var movesDef = {
 };
 
 
+var moveAxes = {
+    "U" : 0, "U2": 0, "U'": 0,
+    "R" : 1, "R2": 1, "R'": 1, 
+    "F" : 2, "F2": 2, "F'": 2, 
+    "L" : 1, "L2": 1, "L'": 1, 
+    "D" : 0, "D2": 0, "D'": 0, 
+    "B" : 2, "B2": 2, "B'": 2,
+
+    "M" : 1, "M2": 1, "M'": 1, 
+    "E" : 0, "E2": 0, "E'": 0,
+    "S" : 2, "S2": 2, "S'": 2,
+
+    "u" : 0, "u2": 0, "u'": 0,
+    "r" : 1, "r2": 1, "r'": 1, 
+    "f" : 2, "f2": 2, "f'": 2,
+    "l" : 1, "l2": 1, "l'": 1,
+    "b" : 2, "b2": 2, "b'": 2,
+    "d" : 0, "d2": 0, "d'": 0,
+
+    "x" : 1, "x2": 1, "x'": 1,
+    "y" : 0, "y2": 0, "y'": 0,
+    "z" : 2, "z2": 2, "z'": 2 
+};
+exports.moveAxes = moveAxes;
+
+
+var trivialFollowSet = {
+    "U" : 0, "U2": 0, "U'": 0,
+    "R" : 1, "R2": 1, "R'": 1, 
+    "F" : 2, "F2": 2, "F'": 2, 
+    "L" : 3, "L2": 3, "L'": 3, 
+    "D" : 4, "D2": 4, "D'": 4, 
+    "B" : 5, "B2": 5, "B'": 5,
+    "M" : 6, "M2": 6, "M'": 6, 
+    "E" : 7, "E2": 7, "E'": 7,
+    "S" : 8, "S2": 8, "S'": 8,
+    "u" : 9, "u2": 9, "u'": 9,
+    "r" : 10, "r2": 10, "r'": 10, 
+    "f" : 11, "f2": 11, "f'": 11,
+    "l" : 12, "l2": 12, "l'": 12,
+    "b" : 13, "b2": 13, "b'": 13,
+    "d" : 14, "d2": 14, "d'": 14,
+    "x" : 15, "x2": 15, "x'": 15,
+    "y" : 16, "y2": 16, "y'": 16,
+    "z" : 17, "z2": 17, "z'": 17
+};
+exports.trivialFollowSet = trivialFollowSet;
+
+
+var isTrivialMove = function (move, moveset) {
+    
+    for (var i=moveset.length-1; i>=0; i--) {
+        if (moveAxes[moveset[i]] === moveAxes[move]) {
+            if (trivialFollowSet[moveset[i]] === trivialFollowSet[move]) {
+                return true; // Trivial turn
+            }
+        } 
+        else {            
+            return false; // Turn on a different axis
+        }
+    }    
+    return false; // No trivial turns
+};
+exports.isTrivialMove = isTrivialMove;
 
 
 var applyMoveCP = function (move, cpstate) {
