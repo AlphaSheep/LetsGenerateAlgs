@@ -24,7 +24,7 @@ var build333MoveTable = function (move) {
     // EO
     tables[move][2] = {};
     for (var hash=0; hash < Math.pow(2, 12); hash++) {
-        state = coord.invertHash(hash, 2, 12);
+        state = coord.invertHash(hash, 1, 12);
         tables[move][2][hash] = coord.getHash(moves.applyMoveEO(move, state), 1);        
     }
     
