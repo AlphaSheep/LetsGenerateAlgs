@@ -4,6 +4,7 @@
 var coord = require("./coords");
 var moves = require("./moves")
 var moveTables = require("./moveTables");
+var pruningTables = require("./pruningTables")
 var utils = require("./utils");
 
 
@@ -47,6 +48,15 @@ var elapsedTime = (nowTime-startTime)/1000;
 console.log("Done in", elapsedTime, "seconds.")
 
 
+console.log("Initialising pruning tables...")
+
+startTime = new Date().getTime();
+pruningTables.build333PruningTables();
+pruningTables.prune(solvedState, solvedState, 0, 0);
+var nowTime = new Date().getTime();
+var elapsedTime = (nowTime-startTime)/1000;
+console.log("Done in", elapsedTime, "seconds.")
+
 
 
 var nMoves = 0;
@@ -86,13 +96,23 @@ while (solving) {
                 continue;
             }
             
-            // Compute the state that's reached by the current sequence
+            // Compute the state that's reached from the start state by the current sequence
             var state = startState;
             for (var j=0; j<sequence.length; j++)            
                 state = moveTables.moveLookup(sequence[j], state);
             state = moveTables.moveLookup(move, state);
             
+            // Compute the state reached by applying the move sequence to the target state (for pruning table purposes)
+            var inverseState = targetState;
+            for (var j=0; j<sequence.length; j++)            
+                inverseState = moveTables.moveLookup(sequence[j], inverseState);
+            inverseState = moveTables.moveLookup(move, inverseState);
             
+            
+            if (pruningTables.prune(state, inverseState, nMoves, maxSearchDepth)) {
+                continue;
+            }
+
             
             if (!(i % 50000)) {
                 nowTime = new Date().getTime();
