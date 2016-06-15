@@ -20,6 +20,20 @@ var factorial = (function() {
 exports.factorial = factorial;
 
 
+var memoizer = function(func) {
+    
+    var cache = {};
+    var slice = Array.prototype.slice;
+    
+    return function() {
+        var args = slice.call(arguments)
+        return (args in cache) ? cache[args] : cache[args] = func.apply(this, args);
+    };
+};
+
+exports.memoizer = memoizer;
+
+
 var expandBaseN = function(n, base, nDigits) {
     // Returns an array of numbers representing 
     // the digits of n represented in the given base.
@@ -38,3 +52,66 @@ var expandBaseN = function(n, base, nDigits) {
 };
 
 exports.expandBaseN = expandBaseN;
+
+
+
+var arraysEqual = function(A, B) {
+    // Equaltity check for nested arrays. If the 
+    // values of all elements in an array are equal
+    // then returns true. Otherwise returns false.
+    
+    if (A==B) {
+        return true;
+    }
+    if (A && B && A.constructor === Array && B.constructor === Array) {
+        if (A.length != B.length) {
+            return false;
+        }
+        for (var i=0; i<A.length; i++) {
+            if (!arraysEqual(A[i], B[i])) {
+                return false;
+            }
+        }
+    } 
+    else {
+        return false
+    }
+    return true;    
+};
+
+exports.arraysEqual = arraysEqual;
+
+/*Tests*/ /*
+console.log(arraysEqual(1,1));
+console.log(arraysEqual(1,2));
+console.log(arraysEqual([1],1));
+console.log(arraysEqual([1],[1]));
+console.log(arraysEqual([1],[2]));
+console.log(arraysEqual([1,2,3],[1,2,3]));
+console.log(arraysEqual([1,2,3],[1,2,1]));
+console.log(arraysEqual([1,2,3],[3,2,1]));
+console.log(arraysEqual([1,[4,5,6],3],[1,[4,5,6],3]));
+console.log(arraysEqual([1,[4,5,6],3],[1,[4,7,6],3]));
+/**/
+
+
+var isMemberOf = function(A, set) {
+    // Deterimine if A is a member of set
+    
+    for (var i=0; i < set.length; i++) {
+        if (arraysEqual(A, set[i])) {
+            return true;
+        }        
+    }
+    return false;
+};
+
+exports.isMemberOf = isMemberOf;
+
+
+/*Tests*/ /*
+console.log(isMemberOf([1,[4,5,6],3],[[1,[4,5,6],3],[1,[4,7,6],3]]));
+console.log(isMemberOf([1,[4,5,6],3],[[1,[4,8,6],3],[1,[4,7,6],3]]));
+/**/
+
+
