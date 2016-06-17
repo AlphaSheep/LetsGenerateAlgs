@@ -51,8 +51,21 @@ for (var i=0; i < allowedMoves.length; i++) {
 pruningTables.build333PruningTables();
 pruningTables.prune(solvedState, solvedState, 0, 0);
 
+var pruningFileName = "Pruning_" + allowedMoves.sort().join("_").replace(/\'/g,"i") + ".json";
 
-//var search = function (startState, targetState, allowedMoves) {
+try {
+    var pTables = require("./"+pruningFileName);
+    pruningTables.tables = pTables;
+}
+catch (e) {
+    
+}
+
+//console.log(pruningTables.tables)
+
+
+
+var search = function (startState, targetState, allowedMoves) {
 
     var nMoves = 0;
     var solving = true;
@@ -175,17 +188,16 @@ pruningTables.prune(solvedState, solvedState, 0, 0);
             solving = false;
         }
     }
-//};
+};
 
 //console.log(pruningTables.tables);
 
 
-//search(startState, targetState, allowedMoves);
+search(startState, targetState, allowedMoves);
 
 /**/
 
 var fs = require("fs");
-var pruningFileName = "Pruning_" + allowedMoves.sort().join("_").replace(/\'/g,"i") + ".json";
 fs.writeFile(pruningFileName, JSON.stringify(pruningTables.tables));
 //console.log(pruningFileName);
 //console.log();
