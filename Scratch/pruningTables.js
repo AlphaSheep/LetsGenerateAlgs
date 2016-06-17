@@ -12,90 +12,10 @@ var build333PruningTables = function () {
     
     var state;
     
-    for (var i=0; i<8; i++) {
+    for (var i=0; i<10; i++) {
         tables[i] = {};
     }
     return;
-    
-    // CO
-    tables[0] = {};
-    for (var hash=0; hash < Math.pow(3,8); hash++) {
-        tables[0][hash] = 0;        
-        nEntries++;
-    }
-    
-    // EO
-    tables[3] = {};
-    for (var hash=0; hash < Math.pow(2, 12); hash++) {
-        tables[3][hash] = 0;        
-        nEntries++;
-    }
-    
-    //CP
-    tables[1] = {};
-    for (var hash=0; hash < Math.pow(9, 4); hash++) {
-        state = coord.positionsToState(coord.invertHash(hash, 8, 4), [1,2,3,4], 8, 8);
-        // Skip states that are missing a piece.
-        if (state.indexOf(1)<0 || state.indexOf(2)<0 || state.indexOf(3)<0 || state.indexOf(4)<0) {
-            continue;
-        }
-        tables[1][hash] = 0;   
-        nEntries++;
-    }
-    tables[2] = {};
-    for (var hash=0; hash < Math.pow(9, 4); hash++) {
-        state = coord.positionsToState(coord.invertHash(hash, 8, 4), [1,2,3,4], 8, 8);
-        // Skip states that are missing a piece.
-        if (state.indexOf(1)<0 || state.indexOf(2)<0 || state.indexOf(3)<0 || state.indexOf(4)<0) {
-            continue;
-        }
-        tables[2][hash] = 0;   
-        nEntries++;
-    }
-    
-    //EP
-    tables[4] = {};
-    for (var hash=0; hash < Math.pow(13, 4); hash++) {
-        state = coord.positionsToState(coord.invertHash(hash, 12, 4), [1,2,3,4], 12, 12);
-        // Skip states that are missing a piece.
-        if (state.indexOf(1)<0 || state.indexOf(2)<0 || state.indexOf(3)<0 || state.indexOf(4)<0) {
-            continue;
-        }
-        tables[4][hash] = 0;  
-        nEntries++;
-    }
-    tables[5] = {};
-    for (var hash=0; hash < Math.pow(13, 4); hash++) {
-        state = coord.positionsToState(coord.invertHash(hash, 12, 4), [1,2,3,4], 12, 12);
-        // Skip states that are missing a piece.
-        if (state.indexOf(1)<0 || state.indexOf(2)<0 || state.indexOf(3)<0 || state.indexOf(4)<0) {
-            continue;
-        }
-        tables[5][hash] = 0;  
-        nEntries++;
-    }
-    tables[6] = {};
-    for (var hash=0; hash < Math.pow(13, 4); hash++) {
-        state = coord.positionsToState(coord.invertHash(hash, 12, 4), [1,2,3,4], 12, 12);
-        // Skip states that are missing a piece.
-        if (state.indexOf(1)<0 || state.indexOf(2)<0 || state.indexOf(3)<0 || state.indexOf(4)<0) {
-            continue;
-        }
-        tables[6][hash] = 0;  
-        nEntries++;
-    }
-        
-    // Centres
-    tables[7] = {};
-    for (var hash=0; hash < Math.pow(7,6); hash++) {
-        state = coord.invertHash(hash, 6, 6);
-        if (state.indexOf(1)<0 || state.indexOf(2)<0 || state.indexOf(3)<0 || 
-            state.indexOf(4)<0 || state.indexOf(5)<0 || state.indexOf(6)<0) {
-            continue;
-        }        
-        tables[7][hash] = 0;           
-        nEntries++;
-    }
     
 };
 exports.build333PruningTables = build333PruningTables;
@@ -109,6 +29,19 @@ var prune = function (state, inverseState, nMoves, maxSearchDepth) {
         }        
 //        console.log(i, Object.keys(tables[i]).length);
     }
+    
+    // EPSum
+    var EPSum = inverseState[4] * inverseState[5] * inverseState[6];
+    if (!tables[8][EPSum] && tables[8][EPSum]!==0) {
+        tables[8][EPSum] = nMoves;
+    }  
+    
+    // CPSum
+    var CPSum = inverseState[1] * inverseState[2];
+    if (!tables[9][CPSum] && tables[9][CPSum]!==0) {
+        tables[9][CPSum] = nMoves;
+    } 
+    
     
     for (var i=0; i<state.length; i++) {
         if ((nMoves + tables[i][state[i]]) > maxSearchDepth) {    
