@@ -9,7 +9,7 @@ var utils = require("./utils");
 
 
 
-var maxSearchDepth  = 8;
+var maxSearchDepth  = 20;
 
 
 
@@ -18,10 +18,14 @@ var solvedState = coord.get333hashes(solvedStateRaw);
 
 
 
-var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,11,4,5,6,7,8,9,10,1,12], [1,2,3,4,5,6]];
+//var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,11,4,5,6,7,8,9,10,1,12], [1,2,3,4,5,6]];
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,4,3,1,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+ var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,4,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 var startState = coord.get333hashes(startStateRaw);
 
+
+console.log(solvedState)
+console.log(startState)
 
 
 //var targetStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,11,4,5,6,7,8,9,10,1,12], [1,2,3,4,5,6]];
@@ -30,13 +34,15 @@ var targetState = solvedState;
 
 
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2"];
+var allowedMoves = ["R","R'","U","U'","U2","F","F'", "L", "L'"];
+var allowedMoves = ["M'","M2","R","R'","U","U'","U2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2"];
 // var allowedMoves = ["R","R'","U","U'","L","L'"];
 // var allowedMoves = ["R","R'","R2","U","U'","F","F'"];
 
 
 
-console.log("Populating move tables...")
+console.log("\n\nPopulating move tables...")
 
 var startTime = new Date().getTime();
 // Populate move tables
@@ -48,7 +54,7 @@ var elapsedTime = (nowTime-startTime)/1000;
 console.log("Done in", elapsedTime, "seconds.")
 
 
-console.log("Initialising pruning tables...")
+console.log("\nInitialising pruning tables...")
 
 startTime = new Date().getTime();
 pruningTables.build333PruningTables();
@@ -114,7 +120,7 @@ while (solving) {
             }
 
             
-            if (!(i % 50000)) {
+            if (!(i % 20000)) {
                 nowTime = new Date().getTime();
                 elapsedTime = (nowTime-startTime)/1000;
                 var nStates = (nStatesTotal+nextMoveSequences.length)
@@ -126,7 +132,7 @@ while (solving) {
                 
                 var logString = "nMoves: " + nMoves +
                             "\t# states: " + nStates +
-                            "(in memory: " + nStatesMemory + ")" +
+                            " (in memory: " + nStatesMemory + ")" +
                             "\tTime elapsed: " + elapsedTime + " s" + 
                             "\t(" + speed + " states/s)";
                 
@@ -142,6 +148,7 @@ while (solving) {
                 
                 console.log("*** Found solution:", (sequence.concat(move)).join(" "), 
                             "after", elapsedTime, "s\n");
+                            
                 continue;
             }
 
