@@ -1,5 +1,6 @@
 "use strict";
 
+var fs = require("fs");
 
 var coord = require("./coords");
 var moves = require("./moves")
@@ -42,24 +43,33 @@ var allowedMoves = ["R","R'","R2","U","U'","U2"];
 
 
 // Populate move tables
+console.log("Populating Move Tables")
+
 for (var i=0; i < allowedMoves.length; i++) {
 //    continue;
-    moveTables.build333MoveTable(allowedMoves[i]);
+    var thisMoveFileName = "./Moves_"+allowedMoves[i].toString().replace(/\'/g,"i")+".json";
+    try {
+        var thisMTable = require(thisMoveFileName);
+        moveTables.tables[allowedMoves[i]] = thisMTable;
+    } 
+    catch (e) {
+        moveTables.build333MoveTable(allowedMoves[i]);
+        fs.writeFile(thisMoveFileName, JSON.stringify(moveTables.tables[allowedMoves[i]]));
+    }
 }
 
 // Initialise pruning tables
+
+console.log("Initialising Pruning Tables")
+
+var pruningFileName = "./Pruning_" + allowedMoves.sort().join("_").replace(/\'/g,"i") + ".json";
+
 pruningTables.build333PruningTables();
 pruningTables.prune(solvedState, solvedState, 0, 0);
-
-var pruningFileName = "Pruning_" + allowedMoves.sort().join("_").replace(/\'/g,"i") + ".json";
-
 try {
-    var pTables = require("./"+pruningFileName);
+    var pTables = require(pruningFileName);
     pruningTables.tables = pTables;
-}
-catch (e) {
-    
-}
+} catch (e) { }
 
 //console.log(pruningTables.tables)
 
@@ -197,7 +207,4 @@ search(startState, targetState, allowedMoves);
 
 /**/
 
-var fs = require("fs");
 fs.writeFile(pruningFileName, JSON.stringify(pruningTables.tables));
-//console.log(pruningFileName);
-//console.log();

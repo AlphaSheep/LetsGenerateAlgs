@@ -32,5 +32,6 @@ node_modules
 # Optional REPL history
 .node_repl_history
 
-
+# Ignore move and pruning tables
 Scratch/Pruning_*.json
+Scratch/Moves_*.json
