@@ -15,6 +15,7 @@ var build333PruningTables = function () {
     for (var i=0; i<10; i++) {
         tables[i] = {};
     }
+    tables.maxLength = 0;
     return;
     
 };
@@ -23,32 +24,48 @@ exports.build333PruningTables = build333PruningTables;
 
 var prune = function (state, inverseState, nMoves, maxSearchDepth) {
     
+    if (nMoves > tables.maxLength) {
+        tables.maxLength = nMoves;
+    }
+    
     for (var i=0; i<inverseState.length; i++) {
-        if (!tables[i][inverseState[i]] && tables[i][inverseState[i]]!==0) {
+        if (!(inverseState[i] in tables[i])) {
             tables[i][inverseState[i]] = nMoves;
         }        
-//        console.log(i, Object.keys(tables[i]).length);
     }
     
     // EPSum
-    var EPSum = inverseState[4] * inverseState[5] * inverseState[6];
-    if (!tables[8][EPSum] && tables[8][EPSum]!==0) {
-        tables[8][EPSum] = nMoves;
+    var EPCombined = inverseState[4] * inverseState[5] * inverseState[6];
+    if (!(EPCombined in tables[8])) {
+        tables[8][EPCombined] = nMoves;
     }  
     
     // CPSum
-    var CPSum = inverseState[1] * inverseState[2];
-    if (!tables[9][CPSum] && tables[9][CPSum]!==0) {
-        tables[9][CPSum] = nMoves;
+    var CPCombined = inverseState[1] * inverseState[2];
+    if (!(CPCombined in tables[9])) {
+        tables[9][CPCombined] = nMoves;
     } 
     
     
     for (var i=0; i<state.length; i++) {
-        if ((nMoves + tables[i][state[i]]) > maxSearchDepth) {    
-//            console.log(i, state, nMoves, tables[i][state[i]], maxSearchDepth)
+        if ((nMoves + tables[i][state[i]]) > maxSearchDepth ||
+            (!(state[i] in tables[i]) && (nMoves + tables.maxLength) > maxSearchDepth)) {    
             return true;
         }        
     }
+    
+    var EPCombined = state[4] * state[5] * state[6];
+    if ((nMoves + tables[8][EPCombined]) > maxSearchDepth ||
+            (!(EPCombined in tables[8]) && (nMoves + tables.maxLength) > maxSearchDepth+1)) {    
+        return true;
+    }  
+    var CPCombined = state[1] * state[2];
+    if ((nMoves + tables[9][CPCombined]) > maxSearchDepth ||
+            (!(CPCombined in tables[9]) && (nMoves + tables.maxLength) > maxSearchDepth+1)) {    
+        return true;
+    }  
+        
+        
     return false;
 };
 exports.prune = prune;
