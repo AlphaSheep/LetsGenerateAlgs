@@ -8,17 +8,19 @@ var moveTables = require("./moveTables");
 var pruningTables = require("./pruningTables")
 var utils = require("./utils");
 
-var maxSearchDepth  = 16;
+var maxSearchDepth  = 15;
 
 var solvedStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 var solvedState = coord.get333hashes(solvedStateRaw);
 
 
 var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,11,4,5,6,7,8,9,10,1,12], [1,2,3,4,5,6]];
-//var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,4,3,1,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
-var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,4,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,2,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+//var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,4,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
-var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+//var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+var startStateRaw = [[0,2,2,0,0,0,2,0], [2,1,7,4,5,6,3,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,7,3,4,5,6,1,8,9,10,11,12], [1,2,3,4,5,6]]; // Sexy
+var startStateRaw = [[0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // One move
 var startState = coord.get333hashes(startStateRaw);
 
 //
@@ -34,10 +36,10 @@ var targetState = solvedState;
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","L", "L'","L2"];
 //var allowedMoves = ["M'","M2","R","R'","U","U'","U2"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2"];
 // var allowedMoves = ["R","R'","U","U'","L","L'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","D","D'"];
-// var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
+var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 
 
 // Populate move tables
@@ -203,7 +205,7 @@ var search = function (startState, targetState, allowedMoves, maxSearchDepth, lo
             nowTime = new Date().getTime();    
             elapsedTime = (nowTime-startTime)/1000;
 
-            console.log("   ", nMoves, " move search complete",
+            console.log("\n   ", nMoves, " move search complete",
                         "\t# states: ", nStatesTotal, 
                         "\tTime elapsed: ", elapsedTime, "s",
                         "\t(",solutions.length,"solutions found so far )\n");
