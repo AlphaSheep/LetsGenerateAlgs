@@ -396,7 +396,7 @@ var init333PruningTables = function () {
 
 var expandPruningTables = function (state, nMoves, filling) {
 
-    let pruneState = state.concat([state[4] * state[5], state[1] * state[2]]);
+    let pruneState = state.concat([state[4] * state[5] * state[6], state[1] * state[2]]);
 
     if (filling && nMoves > pruningTables.maxLength) {
         pruningTables.maxLength = nMoves;
@@ -419,7 +419,7 @@ var prune = function (state, nMoves, maxSearchDepth, usePartial) {
     let estMovesLowerBound = 0;
     let fallbackLowerBound = Math.max(pruningTables.maxLength, usePartial*pruningTables.partialLength, nMoves);
     
-    let pruneState = state.concat([state[4] * state[5], state[1] * state[2]]);
+    let pruneState = state.concat([state[4] * state[5] * state[6], state[1] * state[2]]);
     
     for (let i=0; i<pruneState.length; i++) {
         if (pruneState[i] in pruningTables[i]) {
@@ -435,6 +435,24 @@ var prune = function (state, nMoves, maxSearchDepth, usePartial) {
     return false;
 };
 
+var estimateMoveLowerBound = function (state, nMoves) {
+    
+    let estMoves = 0;
+    let fallbackLowerBound = Math.max(pruningTables.maxLength, pruningTables.partialLength, nMoves);
+    
+    let pruneState = state.concat([state[4] * state[5] * state[6], state[1] * state[2]]);
+    
+    for (let i = 0; i < pruneState.length; i++) {
+        if (pruneState[i] in pruningTables[i]) {
+            estMoves = Math.max(estMoves, pruningTables[i][pruneState[i]]);
+        } 
+        else {
+            estMoves = Math.max(estMoves, fallbackLowerBound);
+        }
+    }        
+        
+    return estMoves;
+};
 
 var arraysEqual = function(A, B) {
     // Equaltity check for nested arrays. If the 
@@ -522,11 +540,131 @@ var depthFirstSearch = function (sequence, startState, targetState, allowedMoves
         
     }
     return solutions;
-
 };
 
 
+
 var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSearchDepth, expandPruning, timeOut, logSteps, logSolutions) {
+    let solutions = [];
+    
+    let nMoves = 0;
+    let solving = true;
+    let hasTimedOut = false;
+
+    let prevSequences = [[]]; // List of all sequences to be continued in the current step
+    // NOTE: This is an array which contains an empty array, because some sequence needs to exist to be continued.
+    let nextSequences = []; // List of all sequences to be continued by the next step
+    
+    let nStatesTotal = 0;
+    
+    let startTime = new Date().getTime();
+    let nowTime = new Date().getTime();
+    let elapsedTime = (nowTime-startTime)/1000;
+    
+    console.log("Starting search to depth", maxSearchDepth);
+
+    while (solving) {
+        nMoves++;
+                
+        while (prevSequences.length > 0) {
+            // While there are still sequences in the stack, process the next sequence
+            
+            // Escape the loop early if neccessary.
+            if (!solving) {
+                break;
+            }
+            
+            // Get the next sequence
+            let sequenceKeys = prevSequences.pop();
+            let sequence = [];
+            for (let j=0; j<sequenceKeys.length; j++) {
+                sequence[j] = allowedMoves[sequenceKeys[j]];
+            }            
+            
+            // Compute the state reached from the start state before the next move
+            let prevState = startState;
+            for (let j=0; j<sequence.length; j++)            
+                prevState = moveLookup(sequence[j], prevState);
+
+            // Compute the state reached from the target state (to add to the pruning table)
+            let prevReverseState = targetState;
+            if (expandPruning) {    
+                for (let j=0; j<sequence.length; j++) {
+                    prevReverseState = moveLookup(sequence[j], prevReverseState);
+                }
+            }
+            
+            for (let m = 0; m < allowedMoves.length; m++) {
+                let move = allowedMoves[m];
+                
+                if (stopSearchNow) {
+                    console.log("Stopping")
+                    hasTimedOut = true;
+                    solving = false;
+                    break;
+                }
+                
+                if (isTrivialMove(move, sequence)) {
+                    continue;
+                }
+                
+                let state = moveLookup(move, prevState);
+                
+                if (expandPruning) {                        
+                    let reverseState = moveLookup(move, prevReverseState);
+                    expandPruningTables(reverseState, nMoves, (expandPruning === 2));
+                }
+                
+                if (!expandPruning || expandPruning<2) {
+                    if (prune(state, nMoves, maxSearchDepth, 1)) {
+                        continue;
+                    }
+                }
+                
+                if (arraysEqual(state, targetState)) {
+                    
+                    solutions.push(sequence.concat(move).join(" "));
+                    
+                    if (logSolutions) {
+                        nowTime = new Date().getTime();
+                        elapsedTime = (nowTime-startTime)/1000;
+
+                        console.log("*** Found solution:", (sequence.concat(move)).join(" "), 
+                                    "after", elapsedTime, "s\n");
+                    }
+
+                    continue;
+                }
+                
+                nStatesTotal++;
+                nextSequences.push(sequenceKeys.concat(m));                
+            }
+        }
+
+        // Move all of the sequences that have just been searched onto the stack, and then clear them
+        prevSequences = nextSequences;
+        nextSequences = [];
+
+        if (logSteps) {
+            nowTime = new Date().getTime();    
+            elapsedTime = (nowTime-startTime)/1000;
+
+            console.log("   ", nMoves, " move search complete",
+                        "\t# states: ", nStatesTotal, 
+                        "\tTime elapsed: ", elapsedTime, "s",
+                        "\t(",solutions.length,"solutions found so far )\n");
+        }
+
+        if (nMoves >= maxSearchDepth) {
+            solving = false;
+        }
+    }
+    return solutions;
+            
+};
+
+
+var breadthFirstSearchOriginal = function (startState, targetState, allowedMoves, maxSearchDepth, expandPruning, timeOut, logSteps, logSolutions) {
     let solutions = [];
     
     let nMoves = 0;
@@ -567,7 +705,7 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
                 let sequence = [];
                 for (let j=0; j<sequenceKeys.length; j++) {
                     sequence[j] = allowedMoves[sequenceKeys[j]];
-                }                
+                }
 
                 // Skip redundant moves
                 if (isTrivialMove(move, sequence)) {
@@ -688,8 +826,56 @@ var sequentialSearch = function(maxSearchDepth, startState, targetState, allowed
     let startDepth = Math.max(5, Math.min(pruningTables.maxLength-1, 8));
     
     for (let k = startDepth; k <= maxSearchDepth; k++) {
-        solutions = breadthFirstSearch(startState, targetState, allowedMoves, k, 1, 10, false, false);
         
+        let startTime = new Date().getTime();
+        
+        solutions = breadthFirstSearch(startState, targetState, allowedMoves, k, 1, 10, false, false);        
+        
+        let nowTime = new Date().getTime();
+        let elapsedTime = (nowTime-startTime)/1000;
+        console.log("    Search to depth",k,"completed in",elapsedTime,"seconds.");
+                    
+        if (solutions === false) {
+            break;
+        }
+        if (solutions.length>2) {
+            if (foundSoln > -1){
+                break;
+            } else {
+                foundSoln++
+            }
+        }        
+        
+    }
+    
+    saveCachedPruningTables();
+    
+    console.log("Sequential search complete")
+    for (let i = 0; i<solutions.length; i++) {
+        console.log(solutions[i]);
+    }
+    return solutions;
+};
+
+var sequentialSearchOriginal = function(maxSearchDepth, startState, targetState, allowedMoves) {
+    // Carries out searches to a sequentially increasing depth. This is much faster than
+    // simply carrying out a search at the required depth as it ensures that the pruning
+    // tables are filled by doing much faster searches at lower depths.
+    let solutions = [];
+    let foundSoln = 0;
+    
+    let startDepth = Math.max(5, Math.min(pruningTables.maxLength-1, 8));
+    
+    for (let k = startDepth; k <= maxSearchDepth; k++) {
+        
+        let startTime = new Date().getTime();
+        
+        solutions = breadthFirstSearchOriginal(startState, targetState, allowedMoves, k, 1, 10, false, false);        
+        
+        let nowTime = new Date().getTime();
+        let elapsedTime = (nowTime-startTime)/1000;
+        console.log("    Search to depth",k,"completed in",elapsedTime,"seconds.");
+                    
         if (solutions === false) {
             break;
         }
@@ -905,7 +1091,7 @@ var solvedState = get333hashes(solvedStateRaw);
 //var startStateRaw = [[0,2,2,0,0,0,2,0], [2,1,7,4,5,6,3,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,7,3,4,5,6,1,8,9,10,11,12], [1,2,3,4,5,6]]; // Sexy
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // One move
 var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // Ja
-//var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
+var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // U
 var startState = get333hashes(startStateRaw);
@@ -918,21 +1104,23 @@ var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","L","L'","L2"];
 
 console.log("Populating Move Tables");
 init333MoveTables(allowedMoves);
-console.log("Done");
 
 console.log("Initialising Pruning Tables");
 init333PruningTables();
 expandPruningTables(solvedState, 0, 0);
 loadCachedPruningTables();
-console.log("Done");
 
 console.log(startStateRaw)
 console.log(startState)
 console.log(allowedMoves)
 
 
-var dosomething = function() {
+var dosomething2 = function() {
     sequentialSearch(11, startState, targetState, allowedMoves)
+}
+
+var dosomething = function() {
+    sequentialSearchOriginal(11, startState, targetState, allowedMoves)
 }
 
 var dosomethingelse = function() {
