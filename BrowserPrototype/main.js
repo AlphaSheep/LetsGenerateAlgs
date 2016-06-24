@@ -414,7 +414,7 @@ var expandPruningTables = function (state, nMoves, filling) {
 }
 
 
-var prune = function (state, nMoves, maxSearchDepth, usePartial) {
+var pruneOld = function (state, nMoves, maxSearchDepth, usePartial) {
     
     let estMovesLowerBound = 0;
     let fallbackLowerBound = Math.max(pruningTables.maxLength, usePartial*pruningTables.partialLength, nMoves);
@@ -435,24 +435,123 @@ var prune = function (state, nMoves, maxSearchDepth, usePartial) {
     return false;
 };
 
-var estimateMoveLowerBound = function (state, nMoves) {
+
+
+
+
+var getPruningCoords = function (state) {
     
-    let estMoves = 0;
-    let fallbackLowerBound = Math.max(pruningTables.maxLength, pruningTables.partialLength, nMoves);
+    // Note: These do not necessarily uniquely identify a state
     
-    let pruneState = state.concat([state[4] * state[5] * state[6], state[1] * state[2]]);
+    return [100*state[0] + state[3], // Edge and Corner Orientation
+            4096*state[1] + state[2],  // Corner Permutation
+            4*state[4] + 2*state[5] + state[6], // Edge Permutation
+            128*state[4] + state[1], // LL Permutation
+            state[7], // centres
+            state[0] + 2*state[1] + 4*state[2] + 8*state[3] + 16*state[4] + 32*state[5] + 64*state[6] + 128*state[7] // Coord sum
+           ]; // Edges
+};
+
+
+var prune = function (state, nMoves, maxSearchDepth, usePartial) {
+        
+    let pruneState = getPruningCoords(state);
     
-    for (let i = 0; i < pruneState.length; i++) {
+    for (let i=0; i<pruneState.length; i++) {
         if (pruneState[i] in pruningTables[i]) {
-            estMoves = Math.max(estMoves, pruningTables[i][pruneState[i]]);
-        } 
-        else {
-            estMoves = Math.max(estMoves, fallbackLowerBound);
+            estMovesLowerBound = pruningTables[i][pruneState[i]];
+        } else {
+            estMovesLowerBound = fallbackLowerBound;
         }
+        if (nMoves + estMovesLowerBound > maxSearchDepth) {    
+            return true;
+        }        
     }        
         
-    return estMoves;
+    return false;
 };
+
+
+var buildPruningTable = function (allowedMoves, targetState, pruningIndex, maxDepth) {
+    
+    let building = true;
+    
+    let previousStates = [targetState];
+    let nextStates = [];
+    
+    let nMoves = 1;
+    
+    pruningTables[pruningIndex] = {};
+
+    let pruneState = getPruningCoords(targetState);
+    pruningTables[pruningIndex][pruneState[pruningIndex]] = 0;
+
+    
+    console.log('Building pruningTables['+pruningIndex+']');
+    
+    let startTime = new Date().getTime();
+    
+    while (building) {
+        
+        console.log('Starting depth',nMoves,'\tstates:', previousStates.length)
+        
+        while (previousStates.length > 0) {
+            
+            let currentState = previousStates.pop();
+            
+            for (let m=0; m<allowedMoves.length; m++) {
+                let move = allowedMoves[m];
+                
+                let state = moveLookup(move, currentState)
+                let pruneState = getPruningCoords(state);
+                
+                if (pruneState[pruningIndex] in pruningTables[pruningIndex]) {
+                    continue
+                }
+                
+                pruningTables[pruningIndex][pruneState[pruningIndex]] = nMoves;
+                
+                nextStates.push(state);                
+            }                          
+        }
+        
+        previousStates = nextStates;
+        nextStates = [];
+                    
+        nMoves++;
+            
+        if (nMoves > maxDepth || previousStates.length === 0) {
+            building = false;
+        }
+    }
+    
+    let nowTime = new Date().getTime();
+    let elapsedTime = (nowTime-startTime)/1000;
+
+    console.log('Done in',elapsedTime,'seconds.');
+};
+
+
+var buildAllPruningTables = function(allowedMoves, targetState) {
+    
+    let startTime = new Date().getTime();
+    
+    pruningTables = {};
+    
+    let pruneState = getPruningCoords(targetState);
+    
+    for (let i=0; i<pruneState.length; i++) {
+        buildPruningTable(allowedMoves, targetState, i, 16);
+    }
+    
+    saveCachedPruningTables();
+    
+    let nowTime = new Date().getTime();
+    let elapsedTime = (nowTime-startTime)/1000;
+
+    console.log('\nBuilt and saved in',elapsedTime,'seconds.\n');
+}
+
 
 var arraysEqual = function(A, B) {
     // Equaltity check for nested arrays. If the 
@@ -1062,8 +1161,10 @@ var loadCachedPruningTables = function() {
 
 var logPruningSizes = function() {
     let nElements = 0;
-    for (let i=0; i<10; i++) {
-        nElements += Object.keys(pruningTables[i]).length;
+    for (let i=0; i<Object.keys(pruningTables).length; i++) {
+        if (pruningTables[i]) {
+            nElements += Object.keys(pruningTables[i]).length;
+        }   
     }        
     console.log("Pruning tables complete to length", pruningTables.maxLength-1);
     console.log("Pruning tables partially filled to length", pruningTables.partialLength);
@@ -1111,8 +1212,10 @@ var startState = get333hashes(startStateRaw);
 
 var targetState = solvedState;
 
+var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
+
 //var allowedMoves = ["R","R'","U","U'","U2","L","L'"];
-var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
+//var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","L","L'","L2"];
 
 console.log("Populating Move Tables");
