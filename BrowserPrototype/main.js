@@ -441,14 +441,18 @@ var pruneOld = function (state, nMoves, maxSearchDepth, usePartial) {
 
 var getPruningCoords = function (state) {
     
-    // Note: These do not necessarily uniquely identify a state
+    // Note: For pruning purposes, these do not need to be reversible, or uniquely identify a state. 
+    // However, for practical reasons, while filling the pruning tables, it is preferable for these
+    // to correspond to a unique case to ensure that the continuation by applying a specific move
+    // will always lead to the same next coordinate. This way, if the state has been reached
+    // before, then there is no reason to continue.
     
-    return [100*state[0] + state[3], // Edge and Corner Orientation
-            4096*state[1] + state[2],  // Corner Permutation
-            4*state[4] + 2*state[5] + state[6], // Edge Permutation
-            128*state[4] + state[1], // LL Permutation
-            state[7], // centres
-            state[0] + 2*state[1] + 4*state[2] + 8*state[3] + 16*state[4] + 32*state[5] + 64*state[6] + 128*state[7] // Coord sum
+    return [(state[0] << 12) + state[3], // Edge and corner orientation
+            (state[1] << 13) + state[2], // Corner permutation
+            (state[4] << 15) + state[6], // UD edge permutation
+            (state[5] << 15) + state[6], // F2L edge permutation
+//            (state[4] << 13) + state[1], // All LL pieces permutation
+            state[7] // centres
            ]; // Edges
 };
 
@@ -457,17 +461,19 @@ var prune = function (state, nMoves, maxSearchDepth, usePartial) {
         
     let pruneState = getPruningCoords(state);
     
-    for (let i=0; i<pruneState.length; i++) {
-        if (pruneState[i] in pruningTables[i]) {
-            estMovesLowerBound = pruningTables[i][pruneState[i]];
-        } else {
-            estMovesLowerBound = fallbackLowerBound;
+    for (let i=0; i<pruneState.length; i++) {       
+        
+        if (!(pruneState[i] in pruningTables[i])) {
+            console.log('State',state);
+            console.log('pruneState',pruneState);
+            console.log('nMoves',nMoves);
+            throw(Error("Not in pruning table ("+pruneState[i]+" not in pruningTables["+i+"])"))
         }
-        if (nMoves + estMovesLowerBound > maxSearchDepth) {    
+        
+        if (nMoves + pruningTables[i][pruneState[i]] > maxSearchDepth) {    
             return true;
         }        
-    }        
-        
+    }                
     return false;
 };
 
@@ -504,7 +510,11 @@ var buildPruningTable = function (allowedMoves, targetState, pruningIndex, maxDe
                 
                 let state = moveLookup(move, currentState)
                 let pruneState = getPruningCoords(state);
-                
+
+//                if (nMoves<3) {
+//                    console.log("    nMoves",nMoves,", state", state,", pruneState", pruneState)
+//                }
+
                 if (pruneState[pruningIndex] in pruningTables[pruningIndex]) {
                     continue
                 }
@@ -684,14 +694,6 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
             let prevState = startState;
             for (let j=0; j<sequence.length; j++)            
                 prevState = moveLookup(sequence[j], prevState);
-
-            // Compute the state reached from the target state (to add to the pruning table)
-            let prevReverseState = targetState;
-            if (expandPruning) {    
-                for (let j=0; j<sequence.length; j++) {
-                    prevReverseState = moveLookup(sequence[j], prevReverseState);
-                }
-            }
             
             for (let m = 0; m < allowedMoves.length; m++) {
                 let move = allowedMoves[m];
@@ -709,15 +711,8 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
                 
                 let state = moveLookup(move, prevState);
                 
-                if (expandPruning) {                        
-                    let reverseState = moveLookup(move, prevReverseState);
-                    expandPruningTables(reverseState, nMoves, (expandPruning === 2));
-                }
-                
-                if (!expandPruning || expandPruning<2) {
-                    if (prune(state, nMoves, maxSearchDepth, 1)) {
-                        continue;
-                    }
+                if (prune(state, nMoves, maxSearchDepth, 1)) {
+                    continue;
                 }
                 
                 if (arraysEqual(state, targetState)) {
@@ -796,6 +791,11 @@ var breadthFirstSearchOriginal = function (startState, targetState, allowedMoves
                 if (stopSearchNow) {
                     console.log("Stopping")
                     hasTimedOut = true;
+                    solving = false;
+                    break;
+                }
+                
+                if (solutions.length > 5) {
                     solving = false;
                     break;
                 }
@@ -925,32 +925,15 @@ var sequentialSearch = function(maxSearchDepth, startState, targetState, allowed
     let resultsDiv = document.getElementById("ResultsDiv");
     resultsDiv.innerHTML = '';
     
-    let startDepth = Math.max(5, Math.min(pruningTables.maxLength-1, 8));
     
-    for (let k = startDepth; k <= maxSearchDepth; k++) {
-        
-        let startTime = new Date().getTime();
-        
-        solutions = breadthFirstSearch(startState, targetState, allowedMoves, k, 1, 10, false, false);        
-        
-        let nowTime = new Date().getTime();
-        let elapsedTime = (nowTime-startTime)/1000;
-        console.log("    Search to depth",k,"completed in",elapsedTime,"seconds.");
-                    
-        if (solutions === false) {
-            break;
-        }
-        if (solutions.length>2) {
-            if (foundSoln > -1){
-                break;
-            } else {
-                foundSoln++
-            }
-        }        
-        
-    }
-    
-    saveCachedPruningTables();
+    let startTime = new Date().getTime();
+
+    solutions = breadthFirstSearch(startState, targetState, allowedMoves, maxSearchDepth, 1, 10, true, false);        
+
+    let nowTime = new Date().getTime();
+    let elapsedTime = (nowTime-startTime)/1000;
+    console.log("    Search to depth",maxSearchDepth,"completed in",elapsedTime,"seconds.");
+
     
     console.log("Sequential search complete")
     for (let i = 0; i<solutions.length; i++) {
@@ -1206,7 +1189,7 @@ var solvedState = get333hashes(solvedStateRaw);
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // One move
 var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // Ja
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
-var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
+//var startStateRaw = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
 //var startStateRaw = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // U
 var startState = get333hashes(startStateRaw);
 
@@ -1214,9 +1197,10 @@ var targetState = solvedState;
 
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
 
+//var allowedMoves = ["R","R'","R2","U","U'","U2"];
 //var allowedMoves = ["R","R'","U","U'","U2","L","L'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","L","L'","L2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","L","L'","L2"];
 
 console.log("Populating Move Tables");
 init333MoveTables(allowedMoves);
@@ -1232,7 +1216,7 @@ console.log(allowedMoves)
 
 
 var dosomething2 = function() {
-    sequentialSearch(17, startState, targetState, allowedMoves)
+    sequentialSearch(16, startState, targetState, allowedMoves)
 }
 
 var dosomething = function() {
@@ -1244,5 +1228,5 @@ var dosomethingelse = function() {
 }
 
 var fillpruningbtn = function() {
-    fillPruningTables(7, startState, targetState, allowedMoves)
+    buildAllPruningTables(allowedMoves, targetState);
 }
