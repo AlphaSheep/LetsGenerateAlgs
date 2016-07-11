@@ -277,8 +277,9 @@ var get333hashes = function(state) {
     
     return [
         getHash(state[0], 2),
-        getHash(findPieces(state[1],[1,2,3,4],8),8),
-        getHash(findPieces(state[1],[5,6,7,8],8),8),
+//        getHash(findPieces(state[1],[1,2,3,4],8),8),
+//        getHash(findPieces(state[1],[5,6,7,8],8),8),
+        getHash(state[1], 8),
         getHash(state[2], 1),
         getHash(findPieces(state[3],[1,2,3,4],12),12),
         getHash(findPieces(state[3],[5,6,7,8],12),12),
@@ -295,8 +296,9 @@ var invert333hashes = function(hashes) {
     
     return [
         invertHash(hashes[0], 3, 8),
-        mergeStates([positionsToState(invertHash(hashes[1], 8, 4), [1,2,3,4], 8, 8),
-                     positionsToState(invertHash(hashes[2], 8, 4), [5,6,7,8], 8, 8)]),
+//        mergeStates([positionsToState(invertHash(hashes[1], 8, 4), [1,2,3,4], 8, 8),
+//                     positionsToState(invertHash(hashes[2], 8, 4), [5,6,7,8], 8, 8)]),
+        invertHash(hashes[3], 8, 8),
         invertHash(hashes[3], 2, 12),
         mergeStates([positionsToState(invertHash(hashes[4], 12, 4), [1,2,3,4], 12, 12),
                      positionsToState(invertHash(hashes[5], 12, 4), [5,6,7,8], 12, 12),
@@ -393,13 +395,24 @@ var getPruningCoords = function (state) {
     // will always lead to the same next coordinate. This way, if the state has been reached
     // before, then there is no reason to continue.
     
+    
+//    let rawState = [invertHash(state[0], 3, 8),
+//        mergeStates([positionsToState(invertHash(state[1], 8, 4), [1,2,3,4], 8, 8),
+//                     positionsToState(invertHash(state[2], 8, 4), [5,6,7,8], 8, 8)])];
+    
+    
+//    return state.concat((Math.floor(state[0]/3) << 11) + (state[3] >> 2));     
+    
     return [(Math.floor(state[0]/3) << 11) + (state[3] >> 2), // Edge and corner orientation
-            (state[1] << 13) + state[2], // Corner permutation
-            (state[4] << 15) + state[6], // UD edge permutation
-            (state[5] << 15) + state[6], // F2L edge permutation
+//            (state[0] << 12) + state[3], // Edge and corner orientation
+            (Math.floor(state[1]/9) << 13) + (state[2]), // Corner permutation
+//            (Math.floor(state[0]/3) << 24) + (Math.floor(state[1]/9) << 13) + (state[2]), // Corner permutation and Orientation
+            (Math.floor(state[4]) << 15) + state[6], // UD edge permutation
+//            (Math.floor(state[5]) << 15) + state[6], // F2L edge permutation
 //            ((state[1]) << 19) + Math.floor(((state[2]) << 12)/81) + Math.floor(state[0]/3), // Corners
-            state[7], // centres
-            ((state[4] % 2197) << 12) + state[3] // ELL
+            state[1], // corners
+            state[6], // centres
+//            ((state[4] % 2197) << 12) + state[3] // ELL
            ]; // Edges
 };
 
@@ -434,7 +447,7 @@ var buildPruningTable = function (allowedMoves, targetState, pruningIndex, maxDe
     
     let nMoves = 1;
     
-    pruningTables[pruningIndex] = {};
+    pruningTables[pruningIndex] = [];
 
     let pruneState = getPruningCoords(targetState);
     pruningTables[pruningIndex][pruneState[pruningIndex]] = 0;
@@ -446,7 +459,9 @@ var buildPruningTable = function (allowedMoves, targetState, pruningIndex, maxDe
     
     while (building) {
         
-        console.log('Starting depth',nMoves,'\tstates:', previousStates.length)
+        let nowTime = new Date().getTime();
+        let elapsedTime = (nowTime-startTime)/1000;
+        console.log('Starting depth',nMoves,'\tstates:', previousStates.length, '('+elapsedTime,'seconds)');
         
 //        if (previousStates.length > 500000) {
 //            console.error("To many states to build pruning table");
@@ -867,6 +882,7 @@ var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L",
 //var allowedMoves = ["R","R'","U","U'","U2","L","L'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","L","L'","L2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
 
 console.log("Populating Move Tables");
 init333MoveTables(allowedMoves);
