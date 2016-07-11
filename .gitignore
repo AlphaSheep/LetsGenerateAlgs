@@ -35,3 +35,12 @@ node_modules
 # Ignore move and pruning tables
 Scratch/Pruning_*.json
 Scratch/Moves_*.json
+
+# Ignore GUI Files
+GUI/node_modules/
+GUI/bower_components/
+GUI/coverage/
+GUI/.sass-cache/
+GUI/.idea/
+GUI/.tmp/
+GUI/dist/
