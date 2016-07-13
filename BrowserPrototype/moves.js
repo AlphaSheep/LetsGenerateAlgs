@@ -563,20 +563,13 @@ var createNewPruningTables = (function () {
         // table information (minimum moves required to reach a state) are stored.
 
         // Initialise Move tables
-        moveTables[coordIndex] = {};
+        let mTables = {};
         for (let m=0; m<allowedMoves.length; m++) {
-            moveTables[coordIndex][allowedMoves[m]] = {};
+            mTables[allowedMoves[m]] = {};
         }
 
         // Initialise pruning table
-        let pruningTableName = allowedMoves.join();    
-        if (!(pruningTableName in pruningTables)) {
-            pruningTables[pruningTableName] = {};
-        }
-        pruningTables[pruningTableName][coordIndex] = {};
-
-        let pTables = pruningTables[pruningTableName][coordIndex];
-        let mTables = moveTables[coordIndex];        
+        let pTables = {};
 
         let building = true;
 
@@ -670,59 +663,63 @@ var createNewPruningTables = (function () {
         for (let s in visitedStates) {
             resultStates.push(parseInt(s));
         }
-        return resultStates;
+                
+        return {
+            states: resultStates, 
+            moving: mTables, 
+            pruning: pTables,
+            coordMap: function(state) {
+                return coord333HashFunction[coordIndex](coord333RawStateMap[coordIndex](state))
+            }
+        };
     };
 
 
-    var moveLookup = function(moveName, coordIndex, state) {
-        return moveTables[coordIndex][moveName][state]
+    var moveLookup = function(mTable, coord) {
+        return mTable[coord];
     }
 
+    var buildCombinedPruningTable = function(allowedMoves, startState, tablesFirst, tablesSecond) {
 
-    var buildCombinedPruningTable = function(allowedMoves, startState, firstCoord, secondCoord) {
-
-        let statesFirst = buildMoveAndPruningTables(allowedMoves, startState, firstCoord);    
-        let statesSecond = buildMoveAndPruningTables(allowedMoves, startState, secondCoord);
-
-        let nStates = statesFirst.length*statesSecond.length;
-
-        console.log("Combining pruning tables tables for", coord333Names[firstCoord], "and", coord333Names[secondCoord],"");
-        console.log("    Size of state space:", nStates);
-
-        let pruningTableName = allowedMoves.join();    
-        let pTableFirst = pruningTables[pruningTableName][firstCoord];
-        let pTableSecond = pruningTables[pruningTableName][secondCoord];
-
+        let statesFirst = tablesFirst.states;
+        let statesSecond = tablesSecond.states;
+        
+        let nStates = statesFirst.length * statesSecond.length;
+        
         console.log("    Starting initialisation");
         let startTime = new Date().getTime();        
 
         let maxFirstIdx = Math.max.apply(Math, statesFirst);
         let maxSecondIdx = Math.max.apply(Math, statesSecond);
 
-        let idxFunc;
-        if (maxFirstIdx < maxSecondIdx) {
-            idxFunc = function (first, second) { return first*(maxSecondIdx+1) + second }
-        }
-        else {
-            idxFunc = function (first, second) { return second*(maxFirstIdx+1) + first }
+        let idxFunc = function (first, second) { return first*(maxSecondIdx+1) + second }
+        
+        let inverseIdxFunc = function (coord) { return [Math.floor(coord/(maxSecondIdx+1)), coord % (maxSecondIdx+1)] }
+        
+        let combinedPruningTable = {};
+        let combinedMoveTable = {};
+        for (let m=0; m<allowedMoves.length; m++) {
+            combinedMoveTable[allowedMoves[m]] = {};
         }
         
-        let inverseIdxFunc;
-        if (maxFirstIdx < maxSecondIdx) {
-            inverseIdxFunc = function (coord) { return [Math.floor(coord/(maxSecondIdx+1)), coord % (maxSecondIdx+1)] }
-        }
-        else {
-            inverseIdxFunc = function (coord) { return [coord % (maxFirstIdx+1), Math.floor(coord/(maxFirstIdx+1))]  }
-        }
-
-        let combinedPruningTable = [];
         for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
-            for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
-                combinedPruningTable[idxFunc(statesFirst[firstIdx],statesSecond[secondIdx])] = -1;//Math.max(pTableFirst[co], pTableSecond[eo]);
+            for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {  
+                let first = statesFirst[firstIdx];
+                let second = statesSecond[secondIdx];
+                
+                let coord = idxFunc(first, second)
+                combinedPruningTable[coord] = -1;
+                
+//                for (let m=0; m<allowedMoves.length; m++) {
+//                    let moveName = allowedMoves[m];
+//                    combinedMoveTable[moveName][coord] = idxFunc(tablesFirst.moving[moveName][first],
+//                        tablesSecond.moving[moveName][second]);
+//                }
             }
         }
-        startFirst = coord333HashFunction[firstCoord](coord333RawStateMap[firstCoord](startState))
-        startSecond = coord333HashFunction[secondCoord](coord333RawStateMap[secondCoord](startState))
+        
+        startFirst = tablesFirst.coordMap(startState);
+        startSecond = tablesSecond.coordMap(startState);
 
         combinedPruningTable[idxFunc(startFirst,startSecond)] = 0;
 
@@ -740,41 +737,39 @@ var createNewPruningTables = (function () {
 
         let i = 0;
         
-        let maxDepth = 12;
+        let maxDepth = 10;
 
-        while ((count < nStates/2) && (i<maxDepth)) {
+        
+        while ((count < nStates/4) && (i<maxDepth)) {
             nowTime = new Date().getTime();
             elapsedTime = (nowTime-startTime)/1000;
 
-            console.log('        Depth',i, ' States:', count,'/',nStates, '[expanding]    \t',elapsedTime,'seconds');
+            console.log('        Depth',i+1, ' States:', count,'/',nStates, '[expanding]    \t',elapsedTime,'seconds');
 
-            for (let m=0; m<allowedMoves.length; m++) {
-                // Obtain a new state by performing each available move on the previous state
+            
+            for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
+                let first = statesFirst[firstIdx];
 
-                let moveName = allowedMoves[m];
-                let move = movesDef[moveName];
+                if (tablesFirst.pruning[first] > i) {
+                    continue;
+                }
+                
+                for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
+                    let second = statesSecond[secondIdx];
 
-                for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
-                    let first = statesFirst[firstIdx];
-
-                    if (pTableFirst[first] > i) {
+                    if (tablesSecond.pruning[second] > i) {
                         continue;
-                    }
+                    }                        
 
-                    let newFirst = moveLookup(moveName, firstCoord, first);
+                    if (combinedPruningTable[idxFunc(first,second)] == i) {
 
-                    for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
-                        let second = statesSecond[secondIdx];
+                        for (let m=0; m<allowedMoves.length; m++) {
+                            // Obtain a new state by performing each available move on the previous state
 
-                        if (pTableSecond[second] > i) {
-                            continue;
-                        }
+                            let moveName = allowedMoves[m];
 
-                        if (combinedPruningTable[idxFunc(first,second)] == i) {
-
-                            let newSecond = moveLookup(moveName, secondCoord, second);
-
-
+                            let newFirst = tablesFirst.moving[moveName][first];
+                            let newSecond = tablesSecond.moving[moveName][second];
 
                             if (combinedPruningTable[idxFunc(newFirst,newSecond)] < 0) {
                                 combinedPruningTable[idxFunc(newFirst,newSecond)] = i+1;
@@ -795,29 +790,32 @@ var createNewPruningTables = (function () {
             nowTime = new Date().getTime();
             elapsedTime = (nowTime-startTime)/1000;
 
-            console.log('        Depth',i, ' States:', count,'/',nStates, '[filling]    \t',elapsedTime,'seconds');
+            console.log('        Depth',i+1, ' States:', count,'/',nStates, '[filling]    \t',elapsedTime,'seconds');
 
-            for (let m=0; m<allowedMoves.length; m++) {
-                // Obtain a new state by performing each available move on the previous state
+            for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
+                let first = statesFirst[firstIdx];
 
-                let moveName = allowedMoves[m];
-                let move = movesDef[moveName];
+                if (tablesFirst.pruning[first] > i) {
+                    continue;
+                }
 
-                for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
-                    let first = statesFirst[firstIdx];
 
-                    if (pTableFirst[first] > i) {
+                for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
+                    let second = statesSecond[secondIdx];
+                    
+                    if (tablesFirst.pruning[second] > i) {
                         continue;
                     }
+                    
+                    if (combinedPruningTable[idxFunc(first,second)] < 0) {
 
-                    let newFirst = moveLookup(moveName, firstCoord, first);
+                        for (let m=0; m<allowedMoves.length; m++) {
+                            // Obtain a new state by performing each available move on the previous state
 
-                    for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
-                        let second = statesSecond[secondIdx];
+                            let moveName = allowedMoves[m];
 
-                        if (combinedPruningTable[idxFunc(first,second)] < 0) {
-
-                            let newSecond = moveLookup(moveName, secondCoord, second);
+                            let newFirst = tablesFirst.moving[moveName][first];
+                            let newSecond = tablesSecond.moving[moveName][second];
 
                             if (combinedPruningTable[idxFunc(newFirst,newSecond)] == i) {
                                 combinedPruningTable[idxFunc(first,second)] = i+1;
@@ -830,119 +828,95 @@ var createNewPruningTables = (function () {
             i++;
         }
 
-        console.log('        Depth',i, ' States:', count,'/',nStates, '[complete]\n');
-
+        console.log('        Applying maximum ('+(i+1)+') to unknown values\n');
+        for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
+            for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
+                if (combinedPruningTable[idxFunc(firstIdx,secondIdx)] < 0) {
+                    combinedPruningTable[idxFunc(firstIdx,secondIdx)] = i+1;
+                }
+            }
+        }
+        
         nowTime = new Date().getTime();
         elapsedTime = (nowTime-startTime)/1000;
 
         console.log("    Finished loop in", elapsedTime, "seconds.")
-        return [combinedPruningTable, idxFunc, inverseIdxFunc];
+        
+        let resultStates = [];
+        for (let s in combinedMoveTable) {
+            resultStates.push(parseInt(s));
+        }
+        
+        return {
+            states: resultStates, 
+            moving: combinedMoveTable, 
+            pruning: combinedPruningTable,
+            coordMap: function(state) {
+                return idxFunc(tablesFirst.coordMap(state), tablesSecond.coordMap(state))
+            }
+        };
+        
     };
 
 
      
 
     var createNewPruningTables = function(allowedMoves, targetState) {
-        // Combined orientation table
-        console.log("\nBuilding combined tables for orientation\n\n")
-        let combined = buildCombinedPruningTable(allowedMoves, targetState, 1, 0)
-
+        
+        let pruningTableName = allowedMoves.join();    
+        
+        // Simple tables
+        
+        // Orientation
+        console.log("\n\nBuilding tables for orientation\n\n")
+        let tablesEO = buildMoveAndPruningTables(allowedMoves, startState, 1);         
+        let tablesCO = buildMoveAndPruningTables(allowedMoves, startState, 0);
+        
         // Corner permutation
         console.log("\n\nBuilding full tables for corner permutation\n\n")
-        let nStatesCP = buildMoveAndPruningTables(allowedMoves, targetState, 2).length;
+        let tablesCP = buildMoveAndPruningTables(allowedMoves, targetState, 2);
 
         // Edges
         console.log("\n\nBuilding multiple small tables for edge permutation\n\n")
-        let nStatesEPU = buildMoveAndPruningTables(allowedMoves, targetState, 9).length;
-        let nStatesEPE = buildMoveAndPruningTables(allowedMoves, targetState, 10).length;
-        let nStatesEPD = buildMoveAndPruningTables(allowedMoves, targetState, 11).length;
+        let tablesEPU = buildMoveAndPruningTables(allowedMoves, targetState, 9);
+        let tablesEPE = buildMoveAndPruningTables(allowedMoves, targetState, 10);
+        let tablesEPD = buildMoveAndPruningTables(allowedMoves, targetState, 11);
 
         // Centres
         console.log("\n\nBuilding tables for centre permutation\n\n")
-        let nStatesCentrs = buildMoveAndPruningTables(allowedMoves, targetState, 8).length;
+        let tablesCentrs = buildMoveAndPruningTables(allowedMoves, targetState, 8);
 
-        let pruningTableName = allowedMoves.join();    
+        
+        let tables = [tablesEO, tablesCO, tablesCP, tablesEPU, tablesEPE, tablesEPD, tablesCentrs];
+        
+        
+        let nStates;
+        
+        // Try combine some tables
+        nStates = (tablesEO.states.length * tablesCO.states.length)        
+        if (nStates < 5000000) {
+            console.log("Combining pruning tables tables for", coord333Names[1], "and", coord333Names[0]);
+            console.log("    Size of state space:", nStates);
+            buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesCO)            
+        }
 
-        let prunerObj = {
-            O: {
-                prune: function(coord) {
-                    return combined[0][coord]
-                },
-                move: function(moveName, coord) {
-                    let states = combined[2](coord);
-                    return combined[1](
-                        moveLookup(moveName, 1, states[0]), 
-                        moveLookup(moveName, 0, states[1]))
-                },
-                coordMap: function(state) {
-                    return combined[1](
-                        coord333HashFunction[1](coord333RawStateMap[1](state)), 
-                        coord333HashFunction[0](coord333RawStateMap[0](state))
-                    )
-                },
-                nStates: combined[2]
-            },
-            CP: {
-                prune: function(coord) {
-                    return pruningTables[pruningTableName][2][coord]
-                },
-                move: function(moveName, coord) {
-                    return moveLookup(moveName, 2, coord)
-                },
-                coordMap: function(state) {
-                    return coord333HashFunction[2](coord333RawStateMap[2](state))
-                },
-                nStates: nStatesCP
-            },
-            EPU: {
-                prune: function(coord) {
-                    return pruningTables[pruningTableName][9][coord]
-                },
-                move: function(moveName, coord) {
-                    return moveLookup(moveName, 9, coord)
-                },
-                coordMap: function(state) {
-                    return coord333HashFunction[9](coord333RawStateMap[9](state))
-                },
-                nStates: nStatesEPU
-            },
-            EPE: {
-                prune: function(coord) {
-                    return pruningTables[pruningTableName][10][coord]
-                },
-                move: function(moveName, coord) {
-                    return moveLookup(moveName, 10, coord)
-                },
-                coordMap: function(state) {
-                    return coord333HashFunction[10](coord333RawStateMap[10](state))
-                },
-                nStates: nStatesEPE
-            },
-            EPD: {
-                prune: function(coord) {
-                    return pruningTables[pruningTableName][11][coord]
-                },
-                move: function(moveName, coord) {
-                    return moveLookup(moveName, 11, coord)
-                },
-                coordMap: function(state) {
-                    return coord333HashFunction[11](coord333RawStateMap[11](state))
-                },
-                nStates: nStatesEPD
-            },
-            Cntrs: {
-                prune: function(coord) {
-                    return pruningTables[pruningTableName][8][coord]
-                },
-                move: function(moveName, coord) {
-                    return moveLookup(moveName, 8, coord)
-                },
-                coordMap: function(state) {
-                    return coord333HashFunction[8](coord333RawStateMap[8](state))
-                },
-                nStates: nStatesCentrs
-            }
-        };
+        nStates = (tablesCP.states.length * tablesCO.states.length)        
+        if (nStates < 1000000) {
+            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[0]);
+            console.log("    Size of state space:", nStates);
+            buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesCO)
+        }
+
+        nStates = (tablesEO.states.length * tablesEPE.states.length)        
+        if (nStates < 2000000) {
+            console.log("Combining pruning tables tables for", coord333Names[1], "and", coord333Names[10]);
+            console.log("    Size of state space:", nStates);
+            buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesEPE)
+        }
+
+        return tables;
+            
+            
         return prunerObj;
     };
     
@@ -958,7 +932,8 @@ var solvedState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,
 
 
 var targetState = solvedState;
-var targetState = [[0,0,0,0,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
+
+//var targetState = [[0,0,0,0,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 
 //var targetState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 
@@ -969,9 +944,10 @@ var targetState = [[0,0,0,0,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,
 //var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
 //var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
 var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // U
+var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [11,2,1,4,5,6,7,8,9,10,3,12], [1,2,3,4,5,6]]; // 6-mover M-slice
+var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,8,6,7,9,10,11,12], [1,2,3,4,5,6]]; // 6-mover E-slice
 
-
-var startState = [[1,2,1,2,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // TSLE
+//var startState = [[1,2,1,2,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // TSLE
 
 //var startState = [[2,1,0,0,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // TTLL
 

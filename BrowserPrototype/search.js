@@ -2,7 +2,7 @@
 
 var coordMap = function(state, tables) {
     let coord = {};
-    for (let p in tables) {
+    for (let p in tables) {        
         coord[p] = tables[p].coordMap(state);
     }
     return coord;
@@ -11,22 +11,22 @@ var coordMap = function(state, tables) {
 var move = function(moveName, coords, tables) {
     let newState = {};
     for (let p in tables) {
-        newState[p] = tables[p].move(moveName, coords[p]);
+        newState[p] = tables[p].moving[moveName][coords[p]];
     }
     return newState;
 };
 
 var prune = function(coord, tables) {
     let nMoves = 0;
-    for (let p in tables) {
-        nMoves = Math.max(nMoves, tables[p].prune(coord[p]));
+    for (let p in tables) {        
+        nMoves = Math.max(nMoves, tables[p].pruning[coord[p]]);
     }
+//    if (nMoves > 4)console.log("Result:", nMoves)
     return nMoves;
 }
 
 var compareStates = function(state, goal) {
     for (let p in state) {
-//        console.log(state[p], goal[p])
         if (state[p] !== goal[p]) {
             return false;
         }
@@ -107,7 +107,7 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
         }
     }
     
-    console.log("\n\nBreadth first search complete in ", (new Date().getTime()-startTime)/1000, "seconds\n\n");
+    console.log("\n\nBreadth first search complete in ", (new Date().getTime()-startTime)/1000, "seconds ("+statesVisited, "states visited)\n\n");
     
     return solutions;
 };
