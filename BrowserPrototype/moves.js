@@ -112,28 +112,6 @@ var trivialFollowSet = {
 };
 
 
-var maxMoveNumbers = {
-    "U" : -1, "U2": -1, "U'": -1,
-    "R" : -1, "R2": -1, "R'": -1, 
-    "F" : 1, "F2": 0, "F'": 1, 
-    "L" : 1, "L2": 0, "L'": 1, 
-    "D" : 1, "D2": 0, "D'": 1, 
-    "B" : 0, "B2": 0, "B'": 0,
-    "M" : 0, "M2": 0, "M'": 0, 
-    "E" : 0, "E2": 0, "E'": 0,
-    "S" : 0, "S2": 0, "S'": 0,
-    "u" : 0, "u2": 0, "u'": 0,
-    "r" : 0, "r2": 0, "r'": 0, 
-    "f" : 0, "f2": 0, "f'": 0,
-    "l" : 0, "l2": 0, "l'": 0,
-    "b" : 0, "b2": 0, "b'": 0,
-    "d" : 0, "d2": 0, "d'": 0,
-    "x" : 0, "x2": 0, "x'": 0,
-    "y" : 0, "y2": 0, "y'": 0,
-    "z" : 0, "z2": 0, "z'": 0
-};
-
-
 var isTrivialMove = function (move, moveset) {
 
     for (let i=moveset.length-1; i>=0; i--) {
@@ -151,7 +129,7 @@ var isTrivialMove = function (move, moveset) {
 
 
 var isAllowedMove = function (move, moveset) {
-    if (maxMoveNumbers[move]==0 || isTrivialMove(move, moveset)) {
+    if (isTrivialMove(move, moveset)) {
         return false;
     }
     if (maxMoveNumbers[move]<0) {
@@ -166,7 +144,7 @@ var isAllowedMove = function (move, moveset) {
             return false
         }
     }    
-    return false; // No trivial turns
+    return true; // No trivial turns
 };
 
 
@@ -856,11 +834,13 @@ var createNewPruningTables = (function () {
         
         console.log('        Depth',i, ' States:', count,'/',nStates, '[complete] \t',elapsedTime,'seconds');
 
-        console.log('        Applying maximum ('+(i+1)+') to unknown values\n');
-        for (let first in combinedPruningTable) {
-            for (let second in combinedPruningTable[first]) {     
-                if (combinedPruningTable[first][second] < 0) {
-                    combinedPruningTable[first][second] = i+1;
+        if(count < nStates) {
+            console.log('        Applying maximum ('+(i+1)+') to unknown values\n');
+            for (let first in combinedPruningTable) {
+                for (let second in combinedPruningTable[first]) {     
+                    if (combinedPruningTable[first][second] < 0) {
+                        combinedPruningTable[first][second] = i+1;
+                    }
                 }
             }
         }
@@ -955,7 +935,7 @@ var createNewPruningTables = (function () {
         // Try combine some tables
         nStates = (tablesEO.states.length * tablesCO.states.length)        
         if (nStates < 5000000) {
-            console.log("Combining pruning tables tables for", coord333Names[1], "and", coord333Names[0]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[1], "and", coord333Names[0]);
             console.log("    Size of state space:", nStates);
               
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesCO));
@@ -963,52 +943,54 @@ var createNewPruningTables = (function () {
 
         nStates = (tablesCP.states.length * tablesCO.states.length)        
         if (nStates < 3000000) {
-            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[0]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[2], "and", coord333Names[0]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesCO));
         }
 
         nStates = (tablesEO.states.length * tablesEPE.states.length)        
         if (nStates < 2000000) {
-            console.log("Combining pruning tables tables for", coord333Names[1], "and", coord333Names[10]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[1], "and", coord333Names[10]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesEPE));
         }
         
         nStates = (tablesEPU.states.length * tablesEPD.states.length)        
         if (nStates < 2000000) {
-            console.log("Combining pruning tables tables for", coord333Names[9], "and", coord333Names[11]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[9], "and", coord333Names[11]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEPU, tablesEPD));
         }
         
         nStates = (tablesEPE.states.length * tablesEPD.states.length)        
         if (nStates < 2000000) {
-            console.log("Combining pruning tables tables for", coord333Names[10], "and", coord333Names[11]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[10], "and", coord333Names[11]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEPE, tablesEPD));
         }
         
         nStates = (tablesCP.states.length * tablesEPD.states.length)        
         if (nStates < 3000000) {
-            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[11]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[2], "and", coord333Names[11]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesEPD));
         }
         
         nStates = (tablesCP.states.length * tablesEPE.states.length)        
         if (nStates < 3000000) {
-            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[10]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[2], "and", coord333Names[10]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesEPE));
         }
         
         nStates = (tablesCP.states.length * tablesEPU.states.length)        
         if (nStates < 3000000) {
-            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[9]);
+            console.log("\n\nCombining pruning tables tables for", coord333Names[2], "and", coord333Names[9]);
             console.log("    Size of state space:", nStates);
             tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesEPU));
         }
+        
+        console.log("\n\nSorting Pruning Tables\n\n")
 
         tables.sort(function (a,b){return averagePruneDepth(b)-averagePruneDepth(a)})
         
@@ -1069,36 +1051,64 @@ var targetState = solvedState;
 //var targetState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
 
 
-//var startState = [[0,2,2,0,0,0,2,0], [2,1,7,4,5,6,3,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,7,3,4,5,6,1,8,9,10,11,12], [1,2,3,4,5,6]]; // Sexy
+var startState = [[0,2,2,0,0,0,2,0], [2,1,7,4,5,6,3,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,7,3,4,5,6,1,8,9,10,11,12], [1,2,3,4,5,6]]; // Sexy
 //var startState = [[0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // One move
 //var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // Ja
-var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
-var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
+//var startState = [[0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // Jb
+//var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
+//var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
 //var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // U
 //var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [11,2,1,4,5,6,7,8,9,10,3,12], [1,2,3,4,5,6]]; // 6-mover M-slice
 //var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,8,6,7,9,10,11,12], [1,2,3,4,5,6]]; // 6-mover E-slice
 
-//var startState = [[0,0,2,1,0,0,0,0], [1,4,3,2,5,6,7,8], [0,1,0,1,0,0,0,0,0,0,0,0], [1,2,4,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // UFRUR'U'F'
+var startState = [[0,0,2,1,0,0,0,0], [1,4,3,2,5,6,7,8], [0,1,0,1,0,0,0,0,0,0,0,0], [1,2,4,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // UFRUR'U'F'
 
 //var startState = [[1,2,1,2,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // TSLE
 
 //var startState = [[2,1,0,0,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // TTLL
 
 
+var maxMoveNumbers = {
+    "U" : -1, "U2": -1, "U'": -1,
+    "R" : -1, "R2": -1, "R'": -1, 
+    "F" : 0, "F2": 0, "F'": 0, 
+    "L" : 0, "L2": 0, "L'": 0, 
+    "D" : 0, "D2": 0, "D'": 0, 
+    "B" : 0, "B2": 0, "B'": 0,
+    "M" : 0, "M2": 0, "M'": 0, 
+    "E" : 0, "E2": 0, "E'": 0,
+    "S" : 0, "S2": 0, "S'": 0,
+    "u" : 0, "u2": 0, "u'": 0,
+    "r" : 0, "r2": 0, "r'": 0, 
+    "f" : 0, "f2": 0, "f'": 0,
+    "l" : 0, "l2": 0, "l'": 0,
+    "b" : 0, "b2": 0, "b'": 0,
+    "d" : 0, "d2": 0, "d'": 0,
+    "x" : 0, "x2": 0, "x'": 0,
+    "y" : -1, "y2": 0, "y'": -1,
+    "z" : 0, "z2": 0, "z'": 0
+};
+
+
 
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2",
-//                    "r","r'","r2","u","u'","u2","f","f'","f2","d","d'","d2","l","l'","l2","b","b'","b2",
-//                    "M","M'","M2","S","S'","S2","E","E'","E2","x","x'","x2","y","y'","y2","z","z'","z2"];
-var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
-var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
+var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L","L'","L2","B","B'","B2",
+                    "r","r'","r2","u","u'","u2","f","f'","f2","d","d'","d2","l","l'","l2","b","b'","b2",
+                    "M","M'","M2","S","S'","S2","E","E'","E2","x","x'","x2","y","y'","y2","z","z'","z2"];
+//var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
+//var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","D","D'","D2"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2"];
 
 
+//for (let i=allowedMoves.length-1; i >= 0; i--) {
+//    if (maxMoveNumbers[allowedMoves[i]] === 0) {
+//        allowedMoves.splice(i,1);
+//    }
+//}
+
+
 console.log('\n\nAllowed moves:', allowedMoves.join(' '),'\n\n')
-
-
 
 var a = function() {
     let startTime = new Date().getTime();
