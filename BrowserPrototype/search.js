@@ -11,23 +11,70 @@ var coordMap = function(state, tables) {
 var move = function(moveName, coords, tables) {
     let newState = {};
     for (let p in tables) {
-        newState[p] = tables[p].moving[moveName][coords[p]];
+        if (tables[p].moving) {
+            newState[p] = tables[p].moving[moveName][coords[p]];
+        }
+        else {
+            newState[p] = tables[p].move(moveName, coords[p]);
+        }
     }
     return newState;
 };
 
-var prune = function(coord, tables) {
-    let nMoves = 0;
-    for (let p in tables) {        
-        nMoves = Math.max(nMoves, tables[p].pruning[coord[p]]);
+var prune = function(coord, availableMoves, tables) {    
+    for (let p in tables) {
+        if (tables[p].maxDepth <= availableMoves) {
+            continue;
+        }
+        if (tables[p].combined) {
+            if (tables[p].pruning[coord[p][0]][coord[p][1]] > availableMoves) {
+                return true
+            }
+        }
+        else {
+            if (tables[p].pruning[coord[p]] > availableMoves) {
+                return true
+            }
+        }
     }
-//    if (nMoves > 4)console.log("Result:", nMoves)
-    return nMoves;
+    return false;
+}
+
+var prune2 = function(coord, tables) {
+    let dist = 0;
+    for (let p in tables) {
+        if (tables[p].combined) {
+//            console.log('  c ', tables[p].pruning[coord[p][0]][coord[p][1]])
+            dist = Math.max(dist, tables[p].pruning[coord[p][0]][coord[p][1]]);
+        }
+        else {
+//            console.log('    ', tables[p].pruning[coord[p]])
+            dist = Math.max(dist, tables[p].pruning[coord[p]]);
+        }
+    }
+//    console.log(dist)
+    return dist;
+}
+
+var prune2 = function(coord, tables) {
+    let dist = 0;
+    for (let p in tables) {
+        if (tables[p].combined) {
+//            console.log('  c ', tables[p].pruning[coord[p][0]][coord[p][1]])
+            dist = Math.max(dist, tables[p].pruning[coord[p][0]][coord[p][1]]);
+        }
+        else {
+//            console.log('    ', tables[p].pruning[coord[p]])
+            dist = Math.max(dist, tables[p].pruning[coord[p]]);
+        }
+    }
+//    console.log(dist)
+    return dist;
 }
 
 var compareStates = function(state, goal) {
-    for (let p in state) {
-        if (state[p] !== goal[p]) {
+    for (let p in state) {        
+        if (state[p]>=0 && state[p] !== goal[p]) {
             return false;
         }
     }
@@ -57,7 +104,7 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
     while (solving && nMoves<maxSearchDepth) {
                 
         nMoves++;
-        console.log("Starting depth",nMoves, "    (", statesVisited, "states visited,", solutions.length,"solutions found )")
+        console.log("Starting depth",nMoves, "    (", statesVisited, "states visited,", solutions.length,"solutions found )", prunedbranches)
         
         while (previousSequences.length > 0) {
             
@@ -78,20 +125,23 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
                 let state = move(moveName, previousState, tables);
                 statesVisited++;
                 
-                if ((nMoves + prune(state, tables)) > maxSearchDepth) {
+//                if (prune2(state, tables) > 6) {
+//                    console.log((maxSearchDepth-nMoves), prune2(state, tables), prune(state, (maxSearchDepth-nMoves), tables))
+//                }
+                if (prune(state, (maxSearchDepth-nMoves), tables)) {
+//                if (prune2(state, tables) > (maxSearchDepth-nMoves)) {
                     prunedbranches++;
                     continue;                    
                 }
                 
                 if (compareStates(state, goal)) {
                     let solution = thisSequence.concat(moveName);
-                    console.log(solution.join(' '))
+                    console.log(solution.join(' '), maxSearchDepth)
                     solutions.push(thisSequence.concat(moveName));
                     
-                    if ((nMoves + slack) > maxSearchDepth) {
+                    if ((nMoves + slack) < maxSearchDepth) {
                         maxSearchDepth = nMoves + slack;
                     }
-                    
                     continue;
                 }
                 
@@ -105,6 +155,7 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
         if (solutions.length>0 && !slack--) {
             break;
         }
+        
     }
     
     console.log("\n\nBreadth first search complete in ", (new Date().getTime()-startTime)/1000, "seconds ("+statesVisited, "states visited)\n\n");
@@ -132,7 +183,7 @@ var depthFirstSearch = function (thisSequence, previousState, goal, allowedMoves
         let state = move(moveName, previousState, tables);
         statesVisited++;
 
-        if (prune(state, tables) > maxSearchDepth) {
+        if (prune(state, (maxSearchDepth), tables)) {
             continue;                    
         }
 
@@ -186,8 +237,9 @@ var IDAstarSearch = function (startState, targetState, allowedMoves, maxSearchDe
     statesVisited = 0;
     
     for (let nMoves=1; nMoves<=maxSearchDepth; nMoves++ ) {
-        console.log("Starting depth",nMoves, "    (", statesVisited, "states visited,", solutions.length,"solutions found )")
-        solutions = startDepthFirstSearch(startState, targetState, allowedMoves, nMoves, tables);
+        console.log("Starting depth",nMoves, "    (", statesVisited, "states visited,", solutions.length,"solutions found ) ", (new Date().getTime()-startTime)/1000, "seconds elapsed.")
+        let theseSolutions = startDepthFirstSearch(startState, targetState, allowedMoves, nMoves, tables);
+        solutions = solutions.concat(theseSolutions)
         if (solutions.length>0 && !slack--) {
             break;
         }
@@ -198,4 +250,30 @@ var IDAstarSearch = function (startState, targetState, allowedMoves, maxSearchDe
     return solutions;
     
 };
+
+
+var pruningChecker = function (startState, targetState, sequence, tables) {
+    
+    let start = coordMap(startState, tables); 
+    let goal = coordMap(targetState, tables);  
+    
+    let state = start;
+    
+    console.log("Minimum moves required:", prune2(state, tables), "\tAll values", pruneGetAllValues(state, tables));    
+    
+    for (let m = 0; m < sequence.length; m++) {
+        let moveName = sequence[m];
+        
+        console.log('Applying move',moveName);
+        
+        state = move(moveName, state, tables);        
+        
+        console.log("Minimum moves required:", prune2(state, tables), "\tAll values", pruneGetAllValues(state, tables));         
+        
+        if (compareStates(state, goal)) {
+            console.log("Target state reached"); 
+        }
+    }    
+};
+
 

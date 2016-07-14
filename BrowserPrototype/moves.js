@@ -1,3 +1,5 @@
+var tables = [];  
+
 var movesDef = {
     "U" : [[0,0,0,0, 0,0,0,0], [1,2,3,0, 4,5,6,7], [0,0,0,0, 0,0,0,0, 0,0,0,0], [1,2,3,0, 4,5,6,7, 8,9,10,11], [0,1,2,3,4,5]],
     "U2": [[0,0,0,0, 0,0,0,0], [2,3,0,1, 4,5,6,7], [0,0,0,0, 0,0,0,0, 0,0,0,0], [2,3,0,1, 4,5,6,7, 8,9,10,11], [0,1,2,3,4,5]],
@@ -110,6 +112,28 @@ var trivialFollowSet = {
 };
 
 
+var maxMoveNumbers = {
+    "U" : -1, "U2": -1, "U'": -1,
+    "R" : -1, "R2": -1, "R'": -1, 
+    "F" : 1, "F2": 0, "F'": 1, 
+    "L" : 1, "L2": 0, "L'": 1, 
+    "D" : 1, "D2": 0, "D'": 1, 
+    "B" : 0, "B2": 0, "B'": 0,
+    "M" : 0, "M2": 0, "M'": 0, 
+    "E" : 0, "E2": 0, "E'": 0,
+    "S" : 0, "S2": 0, "S'": 0,
+    "u" : 0, "u2": 0, "u'": 0,
+    "r" : 0, "r2": 0, "r'": 0, 
+    "f" : 0, "f2": 0, "f'": 0,
+    "l" : 0, "l2": 0, "l'": 0,
+    "b" : 0, "b2": 0, "b'": 0,
+    "d" : 0, "d2": 0, "d'": 0,
+    "x" : 0, "x2": 0, "x'": 0,
+    "y" : 0, "y2": 0, "y'": 0,
+    "z" : 0, "z2": 0, "z'": 0
+};
+
+
 var isTrivialMove = function (move, moveset) {
 
     for (let i=moveset.length-1; i>=0; i--) {
@@ -120,6 +144,26 @@ var isTrivialMove = function (move, moveset) {
         } 
         else {            
             return false; // Preceded by turn on a different axis
+        }
+    }    
+    return false; // No trivial turns
+};
+
+
+var isAllowedMove = function (move, moveset) {
+    if (maxMoveNumbers[move]==0 || isTrivialMove(move, moveset)) {
+        return false;
+    }
+    if (maxMoveNumbers[move]<0) {
+        return true;
+    }
+    count = 0;
+    for (let i=moveset.length-1; i>=0; i--) {
+        if (moveset[i] === move) {
+            count++
+        }
+        if (count >= maxMoveNumbers[move]) {
+            return false
         }
     }    
     return false; // No trivial turns
@@ -556,7 +600,7 @@ var createNewPruningTables = (function () {
     var pruningTables = {};
 
 
-    var buildMoveAndPruningTables = function (allowedMoves, startState, coordIndex) {
+    var buildMoveAndPruningTables = function (allowedMoves, targetState, coordIndex) {
         // Does a complete breadth first search through each coordinate to find all possible states 
         // for that coordinate. Each state is only visited once to speed up the search.
         // Move Table information (which coordinate follows from doing a certain move) and Pruning
@@ -573,7 +617,7 @@ var createNewPruningTables = (function () {
 
         let building = true;
 
-        let previousStates = [coord333RawStateMap[coordIndex](startState)];
+        let previousStates = [coord333RawStateMap[coordIndex](targetState)];
         let nextStates = [];
 
         let visitedStates = {};
@@ -628,7 +672,7 @@ var createNewPruningTables = (function () {
                     // Add the move to the move table
                     mTables[moveName][fromHash] = toHash;
 
-                    if (visitedStates[toHash]) {
+                    if (visitedStates[toHash] || visitedStates[toHash]===0) {
                         // Don't add to the stack if it's been added before.
                         continue;
                     }
@@ -666,6 +710,7 @@ var createNewPruningTables = (function () {
                 
         return {
             states: resultStates, 
+            combined: false,
             moving: mTables, 
             pruning: pTables,
             coordMap: function(state) {
@@ -679,7 +724,7 @@ var createNewPruningTables = (function () {
         return mTable[coord];
     }
 
-    var buildCombinedPruningTable = function(allowedMoves, startState, tablesFirst, tablesSecond) {
+    var buildCombinedPruningTable = function(allowedMoves, targetState, tablesFirst, tablesSecond) {
 
         let statesFirst = tablesFirst.states;
         let statesSecond = tablesSecond.states;
@@ -689,39 +734,21 @@ var createNewPruningTables = (function () {
         console.log("    Starting initialisation");
         let startTime = new Date().getTime();        
 
-        let maxFirstIdx = Math.max.apply(Math, statesFirst);
-        let maxSecondIdx = Math.max.apply(Math, statesSecond);
-
-        let idxFunc = function (first, second) { return first*(maxSecondIdx+1) + second }
-        
-        let inverseIdxFunc = function (coord) { return [Math.floor(coord/(maxSecondIdx+1)), coord % (maxSecondIdx+1)] }
-        
         let combinedPruningTable = {};
-        let combinedMoveTable = {};
-        for (let m=0; m<allowedMoves.length; m++) {
-            combinedMoveTable[allowedMoves[m]] = {};
-        }
-        
+               
         for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
+//            let first = statesFirst[firstIdx];
+            combinedPruningTable[statesFirst[firstIdx]] = {};
             for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {  
-                let first = statesFirst[firstIdx];
-                let second = statesSecond[secondIdx];
+                combinedPruningTable[statesFirst[firstIdx]][statesSecond[secondIdx]] = -1;
                 
-                let coord = idxFunc(first, second)
-                combinedPruningTable[coord] = -1;
-                
-//                for (let m=0; m<allowedMoves.length; m++) {
-//                    let moveName = allowedMoves[m];
-//                    combinedMoveTable[moveName][coord] = idxFunc(tablesFirst.moving[moveName][first],
-//                        tablesSecond.moving[moveName][second]);
-//                }
             }
         }
         
-        startFirst = tablesFirst.coordMap(startState);
-        startSecond = tablesSecond.coordMap(startState);
+        startFirst = tablesFirst.coordMap(targetState);
+        startSecond = tablesSecond.coordMap(targetState);
 
-        combinedPruningTable[idxFunc(startFirst,startSecond)] = 0;
+        combinedPruningTable[startFirst][startSecond] = 0;
 
         nowTime = new Date().getTime();
         elapsedTime = (nowTime-startTime)/1000;
@@ -734,13 +761,15 @@ var createNewPruningTables = (function () {
         // Forward search    
 
         let count = 1;
-
+        let lastCount = count;
+        let complete = false;
+        
         let i = 0;
         
-        let maxDepth = 10;
+        let maxDepth = 13;
 
         
-        while ((count < nStates/4) && (i<maxDepth)) {
+        while ((count < nStates/2) && (i<maxDepth) && !complete) {
             nowTime = new Date().getTime();
             elapsedTime = (nowTime-startTime)/1000;
 
@@ -750,29 +779,20 @@ var createNewPruningTables = (function () {
             for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
                 let first = statesFirst[firstIdx];
 
-                if (tablesFirst.pruning[first] > i) {
-                    continue;
-                }
-                
                 for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
                     let second = statesSecond[secondIdx];
 
-                    if (tablesSecond.pruning[second] > i) {
-                        continue;
-                    }                        
-
-                    if (combinedPruningTable[idxFunc(first,second)] == i) {
+                    if (combinedPruningTable[first][second] == i) {
 
                         for (let m=0; m<allowedMoves.length; m++) {
                             // Obtain a new state by performing each available move on the previous state
 
                             let moveName = allowedMoves[m];
 
-                            let newFirst = tablesFirst.moving[moveName][first];
-                            let newSecond = tablesSecond.moving[moveName][second];
-
-                            if (combinedPruningTable[idxFunc(newFirst,newSecond)] < 0) {
-                                combinedPruningTable[idxFunc(newFirst,newSecond)] = i+1;
+                            let newCoords = [tablesFirst.moving[moveName][first], tablesSecond.moving[moveName][second]]
+                            
+                            if (combinedPruningTable[newCoords[0]][newCoords[1]] < 0) {
+                                combinedPruningTable[newCoords[0]][newCoords[1]] = i+1;
                                 count++;
                             }
                         }
@@ -780,13 +800,20 @@ var createNewPruningTables = (function () {
                 }
             }
             i++;
-            if (count == 1) {
+            if (i>1 && count === 1) {
+                console.log(startFirst, startSecond);
+                console.log(tablesFirst)
+                console.log(tablesSecond)
                 throw(Error("No continuations from start state"))
             }
+            if (count === lastCount) {
+                complete = true;
+            }
+            lastCount = count;
         }
 
         // Backward search    
-        while ((count < nStates) && (i<maxDepth)) {
+        while ((count < nStates) && (i<maxDepth) && !complete) {
             nowTime = new Date().getTime();
             elapsedTime = (nowTime-startTime)/1000;
 
@@ -795,44 +822,45 @@ var createNewPruningTables = (function () {
             for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
                 let first = statesFirst[firstIdx];
 
-                if (tablesFirst.pruning[first] > i) {
-                    continue;
-                }
-
-
                 for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
                     let second = statesSecond[secondIdx];
-                    
-                    if (tablesFirst.pruning[second] > i) {
-                        continue;
-                    }
-                    
-                    if (combinedPruningTable[idxFunc(first,second)] < 0) {
+                                        
+                    if (combinedPruningTable[first][second] < 0) {
 
                         for (let m=0; m<allowedMoves.length; m++) {
                             // Obtain a new state by performing each available move on the previous state
 
                             let moveName = allowedMoves[m];
 
-                            let newFirst = tablesFirst.moving[moveName][first];
-                            let newSecond = tablesSecond.moving[moveName][second];
-
-                            if (combinedPruningTable[idxFunc(newFirst,newSecond)] == i) {
-                                combinedPruningTable[idxFunc(first,second)] = i+1;
+                            let newCoords = [tablesFirst.moving[moveName][first], tablesSecond.moving[moveName][second]]
+                                                        
+                            if (combinedPruningTable[newCoords[0]][newCoords[1]] == i) {
+                                combinedPruningTable[first][second] = i+1;
                                 count++;
+                                break;
                             }
                         }
                     }
                 }
             }
             i++;
+            if (count === lastCount) {
+                complete = true;
+            }
+            lastCount = count;         
+
         }
+        
+        nowTime = new Date().getTime();
+        elapsedTime = (nowTime-startTime)/1000;
+        
+        console.log('        Depth',i, ' States:', count,'/',nStates, '[complete] \t',elapsedTime,'seconds');
 
         console.log('        Applying maximum ('+(i+1)+') to unknown values\n');
-        for (let firstIdx=0; firstIdx < statesFirst.length; firstIdx++) {
-            for (let secondIdx=0; secondIdx < statesSecond.length; secondIdx++) {     
-                if (combinedPruningTable[idxFunc(firstIdx,secondIdx)] < 0) {
-                    combinedPruningTable[idxFunc(firstIdx,secondIdx)] = i+1;
+        for (let first in combinedPruningTable) {
+            for (let second in combinedPruningTable[first]) {     
+                if (combinedPruningTable[first][second] < 0) {
+                    combinedPruningTable[first][second] = i+1;
                 }
             }
         }
@@ -841,25 +869,57 @@ var createNewPruningTables = (function () {
         elapsedTime = (nowTime-startTime)/1000;
 
         console.log("    Finished loop in", elapsedTime, "seconds.")
-        
-        let resultStates = [];
-        for (let s in combinedMoveTable) {
-            resultStates.push(parseInt(s));
-        }
-        
+                
         return {
-            states: resultStates, 
-            moving: combinedMoveTable, 
+            states: [],
+            combined: true,
+            moving: false,
+            move: function(moveName, coords) {
+                return [tablesFirst.moving[moveName][coords[0]], tablesSecond.moving[moveName][coords[1]]]
+            },
             pruning: combinedPruningTable,
             coordMap: function(state) {
-                return idxFunc(tablesFirst.coordMap(state), tablesSecond.coordMap(state))
+                return [tablesFirst.coordMap(state), tablesSecond.coordMap(state)]
             }
         };
         
     };
 
 
-     
+    var averagePruneDepth = function (table) {
+        let average = 0;
+        let count = 0;
+        for (let x in table.pruning) {
+            if (table.combined) {
+                for (let y in table.pruning[x]) {
+                    average = ((average*count) + table.pruning[x][y])/(count+1);
+                    count++;
+                }            
+            }
+            else {
+                average = ((average*count) + table.pruning[x])/(count+1);
+                count++;
+            }
+        }
+        return average;
+    };
+
+    
+    var maxPruneDepth = function (table) {
+        let max = 0;
+        for (let x in table.pruning) {
+            if (table.combined) {
+                for (let y in table.pruning[x]) {
+                    max = (table.pruning[x][y]>max) ? table.pruning[x][y] : max;
+                }            
+            }
+            else {
+                max = (table.pruning[x]>max) ? table.pruning[x] : max;
+            }
+        }
+        return max;
+    };
+
 
     var createNewPruningTables = function(allowedMoves, targetState) {
         
@@ -869,8 +929,8 @@ var createNewPruningTables = (function () {
         
         // Orientation
         console.log("\n\nBuilding tables for orientation\n\n")
-        let tablesEO = buildMoveAndPruningTables(allowedMoves, startState, 1);         
-        let tablesCO = buildMoveAndPruningTables(allowedMoves, startState, 0);
+        let tablesEO = buildMoveAndPruningTables(allowedMoves, targetState, 1);         
+        let tablesCO = buildMoveAndPruningTables(allowedMoves, targetState, 0);
         
         // Corner permutation
         console.log("\n\nBuilding full tables for corner permutation\n\n")
@@ -887,7 +947,7 @@ var createNewPruningTables = (function () {
         let tablesCentrs = buildMoveAndPruningTables(allowedMoves, targetState, 8);
 
         
-        let tables = [tablesEO, tablesCO, tablesCP, tablesEPU, tablesEPE, tablesEPD, tablesCentrs];
+        tables = [tablesEO, tablesCO, tablesCP, tablesEPU, tablesEPE, tablesEPD, tablesCentrs];
         
         
         let nStates;
@@ -897,35 +957,106 @@ var createNewPruningTables = (function () {
         if (nStates < 5000000) {
             console.log("Combining pruning tables tables for", coord333Names[1], "and", coord333Names[0]);
             console.log("    Size of state space:", nStates);
-            buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesCO)            
+              
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesCO));
         }
 
         nStates = (tablesCP.states.length * tablesCO.states.length)        
-        if (nStates < 1000000) {
+        if (nStates < 3000000) {
             console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[0]);
             console.log("    Size of state space:", nStates);
-            buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesCO)
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesCO));
         }
 
         nStates = (tablesEO.states.length * tablesEPE.states.length)        
         if (nStates < 2000000) {
             console.log("Combining pruning tables tables for", coord333Names[1], "and", coord333Names[10]);
             console.log("    Size of state space:", nStates);
-            buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesEPE)
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEO, tablesEPE));
+        }
+        
+        nStates = (tablesEPU.states.length * tablesEPD.states.length)        
+        if (nStates < 2000000) {
+            console.log("Combining pruning tables tables for", coord333Names[9], "and", coord333Names[11]);
+            console.log("    Size of state space:", nStates);
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEPU, tablesEPD));
+        }
+        
+        nStates = (tablesEPE.states.length * tablesEPD.states.length)        
+        if (nStates < 2000000) {
+            console.log("Combining pruning tables tables for", coord333Names[10], "and", coord333Names[11]);
+            console.log("    Size of state space:", nStates);
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesEPE, tablesEPD));
+        }
+        
+        nStates = (tablesCP.states.length * tablesEPD.states.length)        
+        if (nStates < 3000000) {
+            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[11]);
+            console.log("    Size of state space:", nStates);
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesEPD));
+        }
+        
+        nStates = (tablesCP.states.length * tablesEPE.states.length)        
+        if (nStates < 3000000) {
+            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[10]);
+            console.log("    Size of state space:", nStates);
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesEPE));
+        }
+        
+        nStates = (tablesCP.states.length * tablesEPU.states.length)        
+        if (nStates < 3000000) {
+            console.log("Combining pruning tables tables for", coord333Names[2], "and", coord333Names[9]);
+            console.log("    Size of state space:", nStates);
+            tables.push(buildCombinedPruningTable(allowedMoves, targetState, tablesCP, tablesEPU));
         }
 
+        tables.sort(function (a,b){return averagePruneDepth(b)-averagePruneDepth(a)})
+        
+        for (let t in tables) {
+            tables[t].maxDepth = maxPruneDepth(tables[t]);
+        }
+        
         return tables;
             
             
-        return prunerObj;
     };
     
     return createNewPruningTables;
 })();
 
 
+var averagePruneDepth = function (table) {
+    let average = 0;
+    let count = 0;
+    for (let x in table.pruning) {
+        if (table.combined) {
+            for (let y in table.pruning[x]) {
+                average = ((average*count) + table.pruning[x][y])/(count+1);
+                count++;
+            }            
+        }
+        else {
+            average = ((average*count) + table.pruning[x])/(count+1);
+            count++;
+        }
+    }
+    return average;
+};
 
-
+var maxPruneDepth = function (table) {
+    let max = 0;
+    for (let x in table.pruning) {
+        if (table.combined) {
+            for (let y in table.pruning[x]) {
+                max = (table.pruning[x][y]>max) ? table.pruning[x][y] : max;
+            }            
+        }
+        else {
+            max = (table.pruning[x]>max) ? table.pruning[x] : max;
+        }
+    }
+    return max;
+};
 
 
 var solvedState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]];
@@ -941,11 +1072,13 @@ var targetState = solvedState;
 //var startState = [[0,2,2,0,0,0,2,0], [2,1,7,4,5,6,3,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,7,3,4,5,6,1,8,9,10,11,12], [1,2,3,4,5,6]]; // Sexy
 //var startState = [[0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [4,1,2,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // One move
 //var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [2,1,3,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // Ja
-//var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
-//var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
-var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // U
-var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [11,2,1,4,5,6,7,8,9,10,3,12], [1,2,3,4,5,6]]; // 6-mover M-slice
-var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,8,6,7,9,10,11,12], [1,2,3,4,5,6]]; // 6-mover E-slice
+var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,4,3,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // T
+var startState = [[0,0,0,0,0,0,0,0], [1,3,2,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [3,2,1,4,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // F
+//var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,3,4,2,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // U
+//var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [11,2,1,4,5,6,7,8,9,10,3,12], [1,2,3,4,5,6]]; // 6-mover M-slice
+//var startState = [[0,0,0,0,0,0,0,0], [1,2,3,4,5,6,7,8], [0,0,0,0,0,0,0,0,0,0,0,0], [1,2,3,4,5,8,6,7,9,10,11,12], [1,2,3,4,5,6]]; // 6-mover E-slice
+
+//var startState = [[0,0,2,1,0,0,0,0], [1,4,3,2,5,6,7,8], [0,1,0,1,0,0,0,0,0,0,0,0], [1,2,4,3,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // UFRUR'U'F'
 
 //var startState = [[1,2,1,2,0,0,0,0], [0,0,0,0,5,6,0,8], [0,0,0,0,0,0,0,0,0,0,0,0], [0,0,0,0,5,6,7,8,9,10,11,12], [1,2,3,4,5,6]]; // TSLE
 
@@ -958,12 +1091,9 @@ var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L",
 //                    "r","r'","r2","u","u'","u2","f","f'","f2","d","d'","d2","l","l'","l2","b","b'","b2",
 //                    "M","M'","M2","S","S'","S2","E","E'","E2","x","x'","x2","y","y'","y2","z","z'","z2"];
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","D","D'","D2"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2"];
-
-
-
 
 
 console.log('\n\nAllowed moves:', allowedMoves.join(' '),'\n\n')
@@ -980,4 +1110,4 @@ var a = function() {
 };
 
 
-var tables = a();
+//var tables = a();
