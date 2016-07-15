@@ -1,25 +1,33 @@
 // moves.js must be loaded first
 
 var coordMap = function(state, tables) {
-    let coord = {};
-    for (let p in tables) {        
-        coord[p] = tables[p].coordMap(state);
+    let coord = [];
+    for (let p in tables) {
+        if (tables[p].combined) {
+            coord[p] = state2coordCombined(tables[p].coordIndex, state);
+        }
+        else {
+            coord[p] = state2coord(tables[p].coordIndex, state);
+        }
     }
     return coord;
 };
 
+
 var move = function(moveName, coords, tables) {
-    let newState = {};
+    let newState = [];
     for (let p in tables) {
-        if (tables[p].moving) {
-            newState[p] = tables[p].moving[moveName][coords[p]];
+        if (tables[p].combined) {
+            newState[p] = [tables[p].moving[0][moveName][coords[p][0]], 
+                           tables[p].moving[1][moveName][coords[p][1]]];
         }
         else {
-            newState[p] = tables[p].move(moveName, coords[p]);
+            newState[p] = tables[p].moving[moveName][coords[p]];
         }
     }
     return newState;
 };
+
 
 var prune = function(coord, availableMoves, tables) {    
     for (let p in tables) {
@@ -220,6 +228,27 @@ var startDepthFirstSearch = function (startState, targetState, allowedMoves, max
     let prunedbranches = 0;
     
                 
+    solutions = depthFirstSearch([], start, goal, allowedMoves, maxSearchDepth, tables);
+            
+    return solutions;
+};
+
+
+var startDepthFirstSearchOnWokers = function (startState, targetState, allowedMoves, maxSearchDepth, tables) {
+    
+    let start = coordMap(startState, tables); 
+    let goal = coordMap(targetState, tables);  
+
+    let solutions = [];
+    
+    let nMoves = 0;
+    let solving = true;
+    
+    let prunedbranches = 0;
+    
+    for (let m = 0; m < allowedMoves.length; m++) {
+        let moveName = allowedMoves[m]; 
+    }
     solutions = depthFirstSearch([], start, goal, allowedMoves, maxSearchDepth, tables);
             
     return solutions;
