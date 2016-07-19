@@ -56,7 +56,7 @@ var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L",
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","D","D'","D2"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2"];
 
 
 //for (let i=allowedMoves.length-1; i >= 0; i--) {

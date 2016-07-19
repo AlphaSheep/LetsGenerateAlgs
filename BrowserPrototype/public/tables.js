@@ -19,30 +19,36 @@ var buildTableOnWorker = function (allowedMoves, targetState, coordIndex) {
 
 var buildBasicTablesOnWorkers = function (allowedMoves, targetState, coordIndices) {
     
-    let startTime = new Date().getTime(); 
-    
-    let tableContainer = {ready: false, requested:0, recieved: 0, tables:[]};
-    
-    for (let i=0; i<coordIndices.length; i++) {
-        let coordIndex = coordIndices[i];
-    
-        let thisWorker = new Worker('basicpruningworker.js');
+    return new Promise(function(resolve, reject) {
+        let startTime = new Date().getTime(); 
 
-        thisWorker.onmessage = function (result) {
-//            console.log("Message recieved from worker", coordIndex);
-            tableContainer.recieved++;
-            if (tableContainer.requested === tableContainer.recieved) {
-                tableContainer.ready = true;
-                let elapsedTime = ((new Date().getTime())-startTime)/1000;
-                console.log("\nAll basic tables ready after", elapsedTime, "seconds.\n")
-            }
-            tableContainer.tables[i] = result.data;
-        }
+        let nRequested = 0;
+        let nRecieved = 0;
+
+        let tables = [];
         
-        tableContainer.requested++
-        thisWorker.postMessage([allowedMoves, targetState, coordIndex]);        
-    }
-    return tableContainer;
+        console.log("Starting basic tables");
+        
+        for (let i=0; i<coordIndices.length; i++) {
+            let coordIndex = coordIndices[i];
+
+            let thisWorker = new Worker('basicpruningworker.js');
+
+            thisWorker.onmessage = function (result) {
+                nRecieved++;
+                tables.push(result.data);
+                
+                if (nRequested === nRecieved) {                    
+                    let elapsedTime = ((new Date().getTime())-startTime)/1000;
+                    console.log("\nAll basic tables ready after", elapsedTime, "seconds.\n")
+                    resolve(tables);
+                }
+            }
+
+            nRequested++
+            thisWorker.postMessage([allowedMoves, targetState, coordIndex]);        
+        }
+    });
 };
 
 
@@ -67,93 +73,80 @@ var buildCombinedTableOnWorker = function (allowedMoves, targetState, tablesFirs
 
 var buildCombinedTablesOnWorkers = function (allowedMoves, targetState, basicTables) {
     
-    let startTime = new Date().getTime(); 
+    return new Promise(function (resolve, reject) {
         
-    let tableContainer = {ready: false, requested:0, recieved: 0, tables:[]};
+        let startTime = new Date().getTime(); 
+        
+        let nRequested = 0;
+        let nRecieved = 0;
     
-    for (let i=0; i<basicTables.length-1; i++) {
-        if (basicTables[i].states.length === 1) {
-            continue
-        }
-        for (let j=i+1; j<basicTables.length; j++) {
-            
-            if (basicTables[j].states.length === 1) {
+        let combinedTables = [];
+        
+        console.log("Starting combined tables", basicTables)
+                
+        for (let i=0; i<basicTables.length-1; i++) {
+            if (basicTables[i].states.length === 1) {
                 continue
             }
-            
-            let nStates = basicTables[i].states.length * basicTables[j].states.length;
-            let maxLogStateSize = Math.floor(Math.log(Math.max(maxLogStateNum(basicTables[i].states),  
-                                                               maxLogStateNum(basicTables[j].states)))/8);
-            let maxAllowedSize = 5000000 / (maxLogStateSize>1 ? maxLogStateSize : 1);
-            
-            if (nStates < maxAllowedSize) {
-//                console.log("  Combining", maxLogStateSize, maxAllowedSize, nStates)
-                let thisWorker = new Worker('combinedpruningworker.js');
+            for (let j=i+1; j<basicTables.length; j++) {
 
-                thisWorker.onmessage = function (result) {
-                    tableContainer.recieved++;
-                    tableContainer.tables.push(result.data[0]);
-                    if (tableContainer.requested === tableContainer.recieved) {
-                        tableContainer.ready = true;
-                        let elapsedTime = ((new Date().getTime())-startTime)/1000;
-                        console.log("\nAll combined tables ready after", elapsedTime, "seconds.\n")
-                    }
+                if (basicTables[j].states.length === 1) {
+                    continue
                 }
-                
-                tableContainer.requested++
-                thisWorker.postMessage([allowedMoves, targetState, basicTables[i], basicTables[j]]);        
-                
+
+                let nStates = basicTables[i].states.length * basicTables[j].states.length;
+                let maxLogStateSize = Math.floor(Math.log(Math.max(maxLogStateNum(basicTables[i].states),  
+                                                                   maxLogStateNum(basicTables[j].states)))/8);
+                let maxAllowedSize = 5000000 / (maxLogStateSize>1 ? maxLogStateSize : 1);
+
+                if (nStates < maxAllowedSize) {
+                    console.log("  Combining", maxLogStateSize, maxAllowedSize, nStates)
+                    let thisWorker = new Worker('combinedpruningworker.js');
+
+                    thisWorker.onmessage = function (result) {
+                        nRecieved++;
+                        combinedTables.push(result.data[0]);
+                        if (nRequested === nRecieved) {
+                            let elapsedTime = ((new Date().getTime())-startTime)/1000;
+                            console.log("\nAll combined tables ready after", elapsedTime, "seconds.\n")
+                            
+                            resolve(combinedTables);
+                        }
+                    }
+
+                    nRequested++
+                    thisWorker.postMessage([allowedMoves, targetState, basicTables[i], basicTables[j]]);        
+
+                }
             }
         }
-    }
-    
-    return tableContainer;
+    });
 };
 
 
 var buildAllTablesOnWorkers = function(allowedMoves, targetState) {
     
-    let coordIndices = [1, 0, 2, 9, 10, 11];
+    return new Promise(function (resolve, reject) {
     
-    let tableContainer = {ready:false, tables:[]};
-    
-    let basicTables;
-    let combinedTables;
-    
-    basicTables = buildBasicTablesOnWorkers(allowedMoves, targetState, coordIndices);
-    
-    let waitForBasic = function() {
-        if (basicTables.ready) {
-            combinedTables = buildCombinedTablesOnWorkers(allowedMoves, targetState, basicTables.tables);
-            waitForCombined();
-        }
-        else {
-            // Wait for tables to be ready
-            setTimeout(waitForBasic,200);
-        }
-    };
-    
-    let waitForCombined = function() {
-        if (combinedTables.ready) {
-            tableContainer.tables = basicTables.tables.concat(combinedTables.tables);
-            for (let t in tableContainer.tables) {
-                tableContainer.tables[t].avgDepth = averagePruneDepth(tableContainer.tables[t]);
-                tableContainer.tables[t].maxDepth = maxPruneDepth(tableContainer.tables[t]);
-            }
+        let coordIndices = [1, 0, 2, 9, 10, 11];
 
-            // Sort tables by usefulness
-            tableContainer.tables.sort(function (a,b){return b.avgDepth-a.avgDepth})
-            tableContainer.ready = true
-        }
-        else {
-            // Wait for tables to be ready
-            setTimeout(waitForCombined,200);
-        }
-    };
-    
-    waitForBasic();
-    
-    return tableContainer;
+        let tableContainer = {ready:false, tables:[]};
+
+        buildBasicTablesOnWorkers(allowedMoves, targetState, coordIndices)
+        .then (function(result) {
+            let basicTables = result;
+            buildCombinedTablesOnWorkers(allowedMoves, targetState, basicTables)
+            .then(function(result) {
+                let tables = basicTables.concat(result);
+                for (let t in tables) {
+                    tables[t].avgDepth = averagePruneDepth(tables[t]);
+                    tables[t].maxDepth = maxPruneDepth(tables[t]);
+                }
+                tables.sort(function (a,b){return b.avgDepth-a.avgDepth})
+                resolve(tables);
+            });
+        });
+    });
 };
 
 
@@ -749,7 +742,9 @@ var loadTablesFromDB = function (tableName) {
     });
 };
 
+
 var tables;
+
 
 var getTables = function(allowedMoves, targetState) {
     let tableName = getTablesKey(allowedMoves, targetState);
@@ -759,10 +754,12 @@ var getTables = function(allowedMoves, targetState) {
             console.log("Tables loaded");
     })
     .catch( function (err) {
-        let tc = buildAllTablesOnWorkers(allowedMoves, targetState);
-        tables = tc.tables;
-        saveTablesToDB(tc.tables, getTablesKey(allowedMoves, targetState));
-        console.log("Tables generated")
+        buildAllTablesOnWorkers(allowedMoves, targetState)
+        .then(function(result) {
+            tables = result;
+            saveTablesToDB(tables, getTablesKey(allowedMoves, targetState));
+            console.log("Tables generated")
+        });
     }
     );
         
