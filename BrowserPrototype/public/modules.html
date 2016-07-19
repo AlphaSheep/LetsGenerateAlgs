@@ -12,26 +12,9 @@
 
         <div id="LoadingStatus">Loading tables</div>
 
-        <div id="ButtonBlock" style="display:none;">
-            <label>
-                Search Depth: <input type="number" id="searchDepth" value="12" min="1" max="20">
-            </label>
-            <div></div>
-            
-<!--            <button onclick="dosomething()">Breadth first search</button>-->
-            <button onclick="dosomething2()">Breadth first search using stack</button>
-<!--            <button onclick="dosomethingelse()">IDA* search</button>-->
-
-            <div></div>
-
-            <button onclick="fillpruningbtn()">Fill pruning tables</button>
-            <button onclick="logPruningSizes()">Pruning table state</button>
-
-            <div></div>
-            
-            <button onclick="window.indexedDB.deleteDatabase('PruningTables'); location.reload();">Drop Pruning Tables</button>
-            <button onclick="window.indexedDB.deleteDatabase('MoveTables'); location.reload();">Drop Move Tables</button>
-        </div>
+        <input></input>
+    
+        <div id="animatedBlock" style="background:#00f; width:0px;">.</div>
         
         <h3>Results:</h3>
         <div id="ResultsDiv"></div>

@@ -111,6 +111,52 @@ var buildCombinedTablesOnWorkers = function (allowedMoves, targetState, basicTab
 };
 
 
+var buildAllTablesOnWorkers = function(allowedMoves, targetState) {
+    
+    let coordIndices = [1, 0, 2, 9, 10, 11];
+    
+    let tableContainer = {ready:false, tables:[]};
+    
+    let basicTables;
+    let combinedTables;
+    
+    basicTables = buildBasicTablesOnWorkers(allowedMoves, targetState, coordIndices);
+    
+    let waitForBasic = function() {
+        if (basicTables.ready) {
+            combinedTables = buildCombinedTablesOnWorkers(allowedMoves, targetState, basicTables.tables);
+            waitForCombined();
+        }
+        else {
+            // Wait for tables to be ready
+            setTimeout(waitForBasic,200);
+        }
+    };
+    
+    let waitForCombined = function() {
+        if (combinedTables.ready) {
+            tableContainer.tables = basicTables.tables.concat(combinedTables.tables);
+            for (let t in tableContainer.tables) {
+                tableContainer.tables[t].avgDepth = averagePruneDepth(tableContainer.tables[t]);
+                tableContainer.tables[t].maxDepth = maxPruneDepth(tableContainer.tables[t]);
+            }
+
+            // Sort tables by usefulness
+            tableContainer.tables.sort(function (a,b){return b.avgDepth-a.avgDepth})
+            tableContainer.ready = true
+        }
+        else {
+            // Wait for tables to be ready
+            setTimeout(waitForCombined,200);
+        }
+    };
+    
+    waitForBasic();
+    
+    return tableContainer;
+};
+
+
 
 var buildMoveAndPruningTables = function (allowedMoves, targetState, coordIndex, logMessages) {
     // Does a complete breadth first search through each coordinate to find all possible states 
@@ -631,3 +677,84 @@ var a = function() {
     return tables;
 };
 
+
+var getTablesKey = function (allowedMoves, targetState) {
+    return (targetState.join('_')+allowedMoves.join('')).replace(/\'/g,"i");
+};
+
+var saveTablesToDB = function (tables, tableName) {
+    
+    let dbrequest = indexedDB.open("Tables", 1);
+    dbrequest.onupgradeneeded = function(event) { 
+        let db = event.target.result;
+        db.createObjectStore("lookupTables", { keyPath: "tablesKey" });
+    };
+    
+    dbrequest.onsuccess = function (event) {
+        let db = event.target.result;
+        
+       let request = db.transaction(['lookupTables'], 'readwrite').objectStore('lookupTables').put({tablesKey: tableName, tables: tables});
+        
+        request.onsuccess = function (event) {
+            console.log ('Tables saved to DB.')
+        };
+
+        request.onerror = function (event) {
+            console.log(event)
+            console.error ('Error writing tables to DB.')
+        };
+        
+    };
+};
+
+var loadTablesFromDB = function (tableName) {
+    
+    return new Promise (function (resolve, reject) {
+    
+//        console.log('Opening DB')
+        let dbrequest = indexedDB.open("Tables", 1);
+        dbrequest.onupgradeneeded = function(event) { 
+            let db = event.target.result;
+            db.createObjectStore("lookupTables", { keyPath: "tablesKey" });
+        };
+
+        dbrequest.onsuccess = function (event) {
+//            console.log('DB open')
+            let db = event.target.result;
+
+//            console.log('Reading tables')
+            let request = db.transaction(['lookupTables'], 'readwrite').objectStore('lookupTables').get(tableName);
+
+            request.onsuccess = function (event) {
+                if (event.target.result) {
+//                    console.log('Tables loaded from DB.')
+                    resolve(event.target.result.tables);
+                }
+                reject(Error('No result'));
+
+            };
+
+            request.onerror = function (event) {
+                console.log(event)
+                console.error('Error reading tables from DB.')
+                reject(Error('Error reading from DB'));
+            };
+
+        };
+
+        dbrequest.onerror = function (event) {
+            reject(Error('Error connecting to DB'));
+        }
+        
+    });
+};
+
+var tables;
+
+var getTables = function(allowedMoves, targetState) {
+    let tableName = getTablesKey(allowedMoves, targetState);
+    loadTablesFromDB(tableName).then(function (result) {
+        tables = result; 
+        console.log("Tables ready");
+    });
+};

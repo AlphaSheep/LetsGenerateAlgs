@@ -173,7 +173,7 @@ var breadthFirstSearch = function (startState, targetState, allowedMoves, maxSea
 
 
 
-var depthFirstSearch = function (thisSequence, previousState, goal, allowedMoves, maxSearchDepth, tables) {
+var depthFirstSearch = function (thisSequence, previousState, goal, allowedMoves, maxSearchDepth, tables, isworker) {
     
     let solutions = [];
     
@@ -197,7 +197,7 @@ var depthFirstSearch = function (thisSequence, previousState, goal, allowedMoves
 
         if (compareStates(state, goal)) {
             if (maxSearchDepth === 1) {
-                let solution = thisSequence.concat(moveName);
+                let solution = thisSequence.concat(moveName);                
                 console.log(solution.join(' '))
                 solutions.push(solution);
             }
@@ -222,40 +222,85 @@ var startDepthFirstSearch = function (startState, targetState, allowedMoves, max
 
     let solutions = [];
     
-    let nMoves = 0;
-    let solving = true;
-    
-    let prunedbranches = 0;
-    
-                
     solutions = depthFirstSearch([], start, goal, allowedMoves, maxSearchDepth, tables);
             
     return solutions;
 };
 
 
-var startDepthFirstSearchOnWokers = function (startState, targetState, allowedMoves, maxSearchDepth, tables) {
+var startDepthFirstSearchOnWorker = function (startState, targetState, allowedMoves, maxSearchDepth, tables) {
     
     let start = coordMap(startState, tables); 
     let goal = coordMap(targetState, tables);  
 
-    let solutions = [];
+    let tableName = getTablesKey(allowedMoves, targetState);
     
-    let nMoves = 0;
-    let solving = true;
-    
-    let prunedbranches = 0;
+    let solutionContainer = {ready:false, solutions:[], nRequested:0, nRecieved:0};
     
     for (let m = 0; m < allowedMoves.length; m++) {
-        let moveName = allowedMoves[m]; 
+        let moveName = allowedMoves[m];
+        
+        let next = move(moveName, start, tables);
+        
+        let thisWorker = new Worker('searchworker.js');
+
+        thisWorker.onmessage = function (result) {
+            if (result.data.length) {
+                solutionContainer.solutions = solutionContainer.solutions.concat([result.data]);
+            }
+            solutionContainer.nRecieved++;
+            if (solutionContainer.nRequested === solutionContainer.nRecieved) {
+                solutionContainer.ready = true;
+            }
+        }
+
+        solutionContainer.nRequested++;
+        solutionContainer.ready = false;        
+        thisWorker.postMessage([[moveName], next, goal, allowedMoves, maxSearchDepth-1, tableName]);
+           
     }
-    solutions = depthFirstSearch([], start, goal, allowedMoves, maxSearchDepth, tables);
-            
-    return solutions;
+    return solutionContainer;
 };
 
 
 var statesVisited = 0;
+
+
+var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, maxSearchDepth, slack, tables) {
+
+    let startTime = new Date().getTime();
+
+    let solutionContainer = {ready: false, solutions: []};
+    let thisIterContainer = {ready: true, solutions: []};
+    statesVisited = 0;
+    
+    let nMoves = 1;
+    
+    let iterateAndWait = function () {
+        
+        if (thisIterContainer.ready) {
+            solutionContainer.solutions = solutionContainer.solutions.concat(thisIterContainer.solutions)
+            nMoves++;
+            
+            console.log("Starting depth",nMoves, "    (", solutionContainer.solutions.length,"solutions found ) ", (new Date().getTime()-startTime)/1000, "seconds elapsed.")
+        
+            thisIterContainer = startDepthFirstSearchOnWorker(startState, targetState, allowedMoves, nMoves, tables);
+        }
+        
+        if ((nMoves < maxSearchDepth) || (solutionContainer.solutions.length>0 && !slack--)) {
+            setTimeout(iterateAndWait,200);
+        }        
+        else {
+            solutionContainer.ready = true;
+            console.log("\n\nIDA* search complete in ", (new Date().getTime()-startTime)/1000, "seconds\n\n");
+        }
+    };
+    
+    iterateAndWait();
+    
+    return solutionContainer;
+    
+};
 
 
 var IDAstarSearch = function (startState, targetState, allowedMoves, maxSearchDepth, slack, tables) {
@@ -265,7 +310,7 @@ var IDAstarSearch = function (startState, targetState, allowedMoves, maxSearchDe
     let solutions = [];
     statesVisited = 0;
     
-    for (let nMoves=1; nMoves<=maxSearchDepth; nMoves++ ) {
+    for (let nMoves=2; nMoves<=maxSearchDepth; nMoves++ ) {
         console.log("Starting depth",nMoves, "    (", statesVisited, "states visited,", solutions.length,"solutions found ) ", (new Date().getTime()-startTime)/1000, "seconds elapsed.")
         let theseSolutions = startDepthFirstSearch(startState, targetState, allowedMoves, nMoves, tables);
         solutions = solutions.concat(theseSolutions)

@@ -56,7 +56,7 @@ var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2","L",
 var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'"];
 //var allowedMoves = ["R","R'","R2","U","U'","U2","D","D'","D2"];
-//var allowedMoves = ["R","R'","R2","U","U'","U2"];
+var allowedMoves = ["R","R'","R2","U","U'","U2"];
 
 
 //for (let i=allowedMoves.length-1; i >= 0; i--) {
@@ -69,6 +69,26 @@ var allowedMoves = ["R","R'","R2","U","U'","U2","F","F'","F2","D","D'","D2"];
 console.log('\n\nAllowed moves:', allowedMoves.join(' '),'\n\n')
 
 
+//tc = buildAllTablesOnWorkers(allowedMoves, targetState)
 
 
-//var tables = a();
+
+
+
+var blockWidth = 100;
+var inc = +1;
+
+var animateBlock = function () {
+    if (blockWidth > 150 || blockWidth < 50) {
+        inc = inc * (-1);
+    }
+    blockWidth = blockWidth + inc;
+    
+    document.getElementById("animatedBlock").style.width = ""+blockWidth+"px";
+    setTimeout(animateBlock, 16)
+};
+
+animateBlock();
+
+
+
