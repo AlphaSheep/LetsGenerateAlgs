@@ -11,6 +11,12 @@ onmessage = function (event) {
     let allowedMoves = event.data[3];
     let maxSearchDepth = event.data[4];
     let tableName = event.data[5];
+    
+    if (event.data[6]) {
+        console.log("Recieved tables")
+        tables = event.data[6];
+    }
+        
         
     if (!tables) {
         // tables have not yet been loaded
@@ -18,6 +24,7 @@ onmessage = function (event) {
         .then(function(result) {
             
             tables = result;
+            console.log("Loaded tables from DB")
             
             let solutions = depthFirstSearch(thisSequence, previousState, goal, allowedMoves, maxSearchDepth, tables, true);
 

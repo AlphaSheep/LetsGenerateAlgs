@@ -246,6 +246,7 @@ var startDepthFirstSearchOnWorkers = function (startState, targetState, allowedM
         let thisWorker = workerBank[m];
 
         thisWorker.onmessage = function (result) {
+//            console.log('Finished move', moveName)
             if (result.data.length) {
                 solutionContainer.solutions = solutionContainer.solutions.concat([result.data]);
             }
@@ -257,7 +258,13 @@ var startDepthFirstSearchOnWorkers = function (startState, targetState, allowedM
 
         solutionContainer.nRequested++;
         solutionContainer.ready = false;        
-        thisWorker.postMessage([[moveName], next, goal, allowedMoves, maxSearchDepth-1, tableName]);
+        if (thisWorker.sentTables) {
+            thisWorker.postMessage([[moveName], next, goal, allowedMoves, maxSearchDepth-1, tableName]);
+        }
+        else {
+            thisWorker.postMessage([[moveName], next, goal, allowedMoves, maxSearchDepth-1, tableName, tables]);
+            thisWorker.sentTables = true;
+        }
            
     }
     return solutionContainer;
@@ -272,6 +279,7 @@ var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, ma
     let workerBank = [];
     for (let m in allowedMoves) {
         workerBank[m] = new Worker('searchworker.js')
+        workerBank[m].sentTables = true;
     }    
     
     let startTime = new Date().getTime();

@@ -753,8 +753,17 @@ var tables;
 
 var getTables = function(allowedMoves, targetState) {
     let tableName = getTablesKey(allowedMoves, targetState);
-    loadTablesFromDB(tableName).then(function (result) {
-        tables = result; 
-        console.log("Tables ready");
-    });
+    loadTablesFromDB(tableName)
+        .then(function (result) {
+            tables = result; 
+            console.log("Tables loaded");
+    })
+    .catch( function (err) {
+        let tc = buildAllTablesOnWorkers(allowedMoves, targetState);
+        tables = tc.tables;
+        saveTablesToDB(tc.tables, getTablesKey(allowedMoves, targetState));
+        console.log("Tables generated")
+    }
+    );
+        
 };
