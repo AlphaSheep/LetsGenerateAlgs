@@ -228,7 +228,7 @@ var startDepthFirstSearch = function (startState, targetState, allowedMoves, max
 };
 
 
-var startDepthFirstSearchOnWorker = function (startState, targetState, allowedMoves, maxSearchDepth, tables) {
+var startDepthFirstSearchOnWorkers = function (startState, targetState, allowedMoves, maxSearchDepth, tables, workerBank) {
     
     let start = coordMap(startState, tables); 
     let goal = coordMap(targetState, tables);  
@@ -242,7 +242,8 @@ var startDepthFirstSearchOnWorker = function (startState, targetState, allowedMo
         
         let next = move(moveName, start, tables);
         
-        let thisWorker = new Worker('searchworker.js');
+//        let thisWorker = new Worker('searchworker.js');
+        let thisWorker = workerBank[m];
 
         thisWorker.onmessage = function (result) {
             if (result.data.length) {
@@ -268,6 +269,11 @@ var statesVisited = 0;
 
 var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, maxSearchDepth, slack, tables) {
 
+    let workerBank = [];
+    for (let m in allowedMoves) {
+        workerBank[m] = new Worker('searchworker.js')
+    }    
+    
     let startTime = new Date().getTime();
 
     let solutionContainer = {ready: false, solutions: []};
@@ -284,7 +290,7 @@ var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, ma
             
             console.log("Starting depth",nMoves, "    (", solutionContainer.solutions.length,"solutions found ) ", (new Date().getTime()-startTime)/1000, "seconds elapsed.")
         
-            thisIterContainer = startDepthFirstSearchOnWorker(startState, targetState, allowedMoves, nMoves, tables);
+            thisIterContainer = startDepthFirstSearchOnWorkers(startState, targetState, allowedMoves, nMoves, tables, workerBank);
         }
         
         if ((nMoves < maxSearchDepth) || (solutionContainer.solutions.length>0 && !slack--)) {

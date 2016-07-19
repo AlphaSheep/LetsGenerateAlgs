@@ -14,10 +14,11 @@ onmessage = function (event) {
         
     if (!tables) {
         // tables have not yet been loaded
-        
         loadTablesFromDB(tableName)
-        .then(function(tables) {
-
+        .then(function(result) {
+            
+            tables = result;
+            
             let solutions = depthFirstSearch(thisSequence, previousState, goal, allowedMoves, maxSearchDepth, tables, true);
 
             postMessage (solutions);
