@@ -1,11 +1,31 @@
 self.importScripts('search.js', 'tables.js', 'coordmoves.js')
 
-
 var tables;
+
+var initialise = function (tableName) {
+    
+    loadTablesFromDB(tableName)
+    .then(function(result) {
+        tables = result;
+        console.log("Loaded tables from DB")
+        console.log(tables);
+    })
+    .catch(function(err) {
+        console.log('Error', tableName, err);
+    });
+}
 
 onmessage = function (event) {
     
+//    console.log(event.data)
+    if (event.data.initialise) {
+        initialise(event.data.tableName);
+        return
+    }
+    
+    
     let thisSequence = event.data[0];
+    
     let previousState = event.data[1];
     let goal = event.data[2];
     let allowedMoves = event.data[3];

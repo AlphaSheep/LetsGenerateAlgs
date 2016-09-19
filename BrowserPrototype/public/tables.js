@@ -672,7 +672,7 @@ var a = function() {
 
 
 var getTablesKey = function (allowedMoves, targetState) {
-    return (targetState.join('_')+allowedMoves.join('')).replace(/\'/g,"i");
+    return (targetState.join('_')+allowedMoves.join('')).replace(/\,/g,"").replace(/\'/g,"i");
 };
 
 var saveTablesToDB = function (tables, tableName) {
@@ -715,23 +715,25 @@ var loadTablesFromDB = function (tableName) {
 //            console.log('DB open')
             let db = event.target.result;
 
-//            console.log('Reading tables')
+            console.log('Reading tables', tableName);
             let request = db.transaction(['lookupTables'], 'readwrite').objectStore('lookupTables').get(tableName);
-
-            request.onsuccess = function (event) {
-                if (event.target.result) {
-//                    console.log('Tables loaded from DB.')
-                    resolve(event.target.result.tables);
-                }
-                reject(Error('No result'));
-
-            };
-
+            
             request.onerror = function (event) {
                 console.log(event)
                 console.error('Error reading tables from DB.')
                 reject(Error('Error reading from DB'));
             };
+            
+            request.onsuccess = function (event) {
+                if (event.target.result) {
+//                    console.log('Tables loaded from DB.')
+                    resolve(event.target.result.tables);
+                }
+                else {
+                    reject(Error('No result'));
+                }
+            };
+
 
         };
 
@@ -747,20 +749,29 @@ var tables;
 
 
 var getTables = function(allowedMoves, targetState) {
-    let tableName = getTablesKey(allowedMoves, targetState);
-    loadTablesFromDB(tableName)
-        .then(function (result) {
-            tables = result; 
-            console.log("Tables loaded");
-    })
-    .catch( function (err) {
-        buildAllTablesOnWorkers(allowedMoves, targetState)
-        .then(function(result) {
-            tables = result;
-            saveTablesToDB(tables, getTablesKey(allowedMoves, targetState));
-            console.log("Tables generated")
-        });
-    }
-    );
+    
+    
+//    return new Promise(function(resolve, reject) {
         
+        let tableName = getTablesKey(allowedMoves, targetState);    
+        console.log('Preparing tables');
+        
+        return loadTablesFromDB(tableName)
+        .then(function (result) {
+            console.log("Tables loaded");
+            tables = result; 
+//            resolve();
+        })
+        .catch( function (err) {
+            console.log('Tables not available. Attempting to generate.')
+            buildAllTablesOnWorkers(allowedMoves, targetState)
+            .then(function(result) {
+                tables = result;
+                console.log('Saving to DB');
+                saveTablesToDB(tables, getTablesKey(allowedMoves, targetState));
+                console.log("Tables generated")
+//                resolve();
+            })
+        });
+//    });
 };

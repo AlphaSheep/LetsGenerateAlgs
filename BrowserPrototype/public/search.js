@@ -251,7 +251,7 @@ var startDepthFirstSearchOnWorkers = function (startState, targetState, allowedM
                 solutionContainer.solutions = solutionContainer.solutions.concat([result.data]);
             }
             solutionContainer.nRecieved++;
-            if (solutionContainer.nRequested === solutionContainer.nRecieved) {
+            if (solutionContainer.nRequested === solutionContainer.nRecieved) {                
                 solutionContainer.ready = true;
             }
         }
@@ -262,6 +262,7 @@ var startDepthFirstSearchOnWorkers = function (startState, targetState, allowedM
             thisWorker.postMessage([[moveName], next, goal, allowedMoves, maxSearchDepth-1, tableName]);
         }
         else {
+            // Sending tables locks up the UI. You don't really want to do it.
             thisWorker.postMessage([[moveName], next, goal, allowedMoves, maxSearchDepth-1, tableName, tables]);
             thisWorker.sentTables = true;
         }
@@ -274,13 +275,13 @@ var startDepthFirstSearchOnWorkers = function (startState, targetState, allowedM
 var statesVisited = 0;
 
 
-var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, maxSearchDepth, slack, tables) {
+var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, maxSearchDepth, slack, tables, workerBank) {
 
-    let workerBank = [];
-    for (let m in allowedMoves) {
-        workerBank[m] = new Worker('searchworker.js')
-        workerBank[m].sentTables = true;
-    }    
+//    let workerBank = [];
+//    for (let m in allowedMoves) {
+//        workerBank[m] = new Worker('searchworker.js')
+//        workerBank[m].sentTables = true;
+//    }    
     
     let startTime = new Date().getTime();
 
@@ -301,7 +302,7 @@ var IDAstarSearchOnWorkers = function (startState, targetState, allowedMoves, ma
             thisIterContainer = startDepthFirstSearchOnWorkers(startState, targetState, allowedMoves, nMoves, tables, workerBank);
         }
         
-        if ((nMoves < maxSearchDepth) || (solutionContainer.solutions.length>0 && !slack--)) {
+        if ((nMoves < maxSearchDepth) && !(solutionContainer.solutions.length>0 && !slack--)) {
             setTimeout(iterateAndWait,200);
         }        
         else {
@@ -365,3 +366,18 @@ var pruningChecker = function (startState, targetState, sequence, tables) {
 };
 
 
+var createWorkerBank = function (allowedMoves, targetState) {
+    
+    let tableName = getTablesKey(allowedMoves, targetState);
+    
+    let workerBank = [];
+    
+    for (let m = 0; m < allowedMoves.length; m++) {
+        workerBank[m] = new Worker('searchworker.js')
+        
+        workerBank[m].postMessage({initialise: true, tableName: tableName})
+        workerBank[m].sentTables = true;
+        
+    }   
+    return workerBank;
+};
