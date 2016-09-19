@@ -1,0 +1,42 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    </head>
+    <body>
+
+        <div id="LoadingStatus">Loading tables</div>
+
+        <div id="ButtonBlock" style="display:none;">
+            <label>
+                Search Depth: <input type="number" id="searchDepth" value="12" min="1" max="20">
+            </label>
+            <div></div>
+            
+<!--            <button onclick="dosomething()">Breadth first search</button>-->
+            <button onclick="dosomething2()">Breadth first search using stack</button>
+<!--            <button onclick="dosomethingelse()">IDA* search</button>-->
+
+            <div></div>
+
+            <button onclick="fillpruningbtn()">Fill pruning tables</button>
+            <button onclick="logPruningSizes()">Pruning table state</button>
+
+            <div></div>
+            
+            <button onclick="window.indexedDB.deleteDatabase('PruningTables'); location.reload();">Drop Pruning Tables</button>
+            <button onclick="window.indexedDB.deleteDatabase('MoveTables'); location.reload();">Drop Move Tables</button>
+        </div>
+        
+        <h3>Results:</h3>
+        <div id="ResultsDiv"></div>
+        
+        <script src="main.js"></script>
+
+    </body>
+</html>
